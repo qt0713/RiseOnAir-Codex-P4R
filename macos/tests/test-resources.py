@@ -20,7 +20,9 @@ assert not list(r.rglob("*arina*"))
 assert "window.chrome" not in (r / "animation/startup-macos.js").read_text()
 assert "<iframe" not in (r / "animation/startup-macos.html").read_text()
 with tempfile.TemporaryDirectory(prefix="rise-macos-test-") as temporary:
-    home = pathlib.Path(temporary)
+    # macOS /var is itself a symlink. Resolve it so this test reaches the
+    # genuine-app precondition instead of passing via the separate path guard.
+    home = pathlib.Path(temporary).resolve()
     config = home / ".codex/config.toml"
     config.parent.mkdir()
     config.write_text('test_sentinel = "preserve-me"\n')
@@ -29,6 +31,10 @@ with tempfile.TemporaryDirectory(prefix="rise-macos-test-") as temporary:
     env = dict(os.environ, HOME=str(home), CODEX_APP_BUNDLE=str(home / "Missing.app"))
     result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "preflight"], env=env, capture_output=True, timeout=30)
     assert result.returncode != 0, "A machine without a genuine Codex app must fail closed"
+    assert b"Could not find the official" in result.stderr, result.stderr
+    result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "install"], env=env, capture_output=True, timeout=30)
+    assert result.returncode != 0 and b"Could not find the official" in result.stderr
+    assert not (home / "Library/Application Support/RiseOnAir/engine").exists()
     assert config.read_bytes() == before
     support = home / "Library/Application Support/RiseOnAir"
     if support.exists():
