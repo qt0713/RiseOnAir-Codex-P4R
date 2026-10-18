@@ -1,6 +1,6 @@
 # Rise On Air · 理世为你接通信号
 
-为 **Windows Codex 桌面客户端**制作的 Persona 4 / 久慈川理世同人主题套装：黄色电视框、珊瑚粉强调、理世壁纸，加上 3.2 秒有声启动动画和专用桌面图标。
+为 **Windows / macOS Codex 桌面客户端**制作的 Persona 4 / 久慈川理世同人主题套装：黄色电视框、珊瑚粉强调、理世壁纸，加上 3.2 秒有声启动动画和专用桌面图标。
 
 基于 [Codex Dream Skin](https://github.com/Fei-Away/Codex-Dream-Skin) 为真实客户端加载主题，保留原生侧栏、项目选择、消息和输入框。不是用网页或截图替代 Codex，也不是 OpenAI、ATLUS 或 SEGA 官方产品。
 
@@ -8,7 +8,11 @@
 
 ![3.2 秒展示版动画画面](docs/startup.png)
 
-## 一键安装
+## macOS 版（Beta）
+
+新增原生 AppKit / WKWebView 启动器、Universal 二进制、理世 ICNS 图标和 DMG/ZIP。[下载 macOS Beta](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.1)，安装与测试范围见 **[macOS 中文说明](docs/MACOS.md)**。macOS 版与 Windows 安装包分开发布；Beta 不代表真实登录用户的主题接入已经全场景验收。
+
+## Windows 一键安装
 
 前往 **[Releases 下载 Windows 安装包](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/latest)**：
 

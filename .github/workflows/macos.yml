@@ -1,0 +1,50 @@
+name: macOS native build and tests
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'macos/**'
+      - 'tools/*macos*'
+      - 'src/animation/**'
+      - 'src/theme/**'
+      - 'src/runtime/**'
+      - '.github/workflows/macos.yml'
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build universal native app
+        run: bash tools/build-macos.sh
+      - name: Test AppKit, WebKit, audio metadata and resource safety
+        run: bash macos/tests/native.sh
+      - name: Package DMG and ZIP
+        run: bash tools/package-macos.sh
+      - name: Mount and verify DMG
+        run: |
+          mount="$RUNNER_TEMP/rise-dmg"
+          mkdir -p "$mount"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" dist/macos/*.dmg
+          codesign --verify --deep --strict "$mount/Rise On Air.app"
+          test -L "$mount/Applications"
+          hdiutil detach "$mount"
+      - name: Upload packages and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rise-${{ matrix.os }}
+          path: |
+            dist/macos/*
+            build/macos-test-*/
+          if-no-files-found: warn
+          retention-days: 14

@@ -19,3 +19,5 @@
 如需转载、商业使用或重新分发人物与录音，请分别核对相应权利来源；署名和链接不改变这些素材的权利归属。关于来源或署名的更正可通过仓库 Issue 提交。
 
 本项目 v1.0.1 对用户目录内 Dream Skin v1.5.21 的 injector.mjs 加入一个按主题 ID 加载本地 CSS 的适配入口。原 MIT 许可保持；修改源码与可逆安装脚本见 installer/Surface-Patch.ps1，样式见 src/runtime/rise-surfaces.css。该修改不属于上游官方发行版。
+
+macOS Beta 使用系统 AppKit / WKWebView，不再包含 Windows WebView2、.NET 或 Inno Setup 运行文件。Mac 主题引擎固定于同一上游提交，构建脚本 tools/prepare-macos.py 校验并调整隔离状态目录、launchd 标识与理世 CSS 加载入口；不包含上游其他角色预设或其图片。原上游 MIT 许可随包保留。Apple SDK 不随包重新分发。
