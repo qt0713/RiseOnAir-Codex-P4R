@@ -27,7 +27,7 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         let version = try? String(contentsOf: resources.appendingPathComponent("VERSION"), encoding: .utf8)
         if !preview && installed == version && installed != nil,
            let codex = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first {
-            codex.activate(options: [.activateIgnoringOtherApps]); NSApp.terminate(nil); return
+            codex.activate(options: [.activateAllWindows]); NSApp.terminate(nil); return
         }
         if !preview && installed != version {
             let alert = NSAlert()

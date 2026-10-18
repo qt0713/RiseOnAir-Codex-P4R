@@ -9,7 +9,7 @@ bash -n "$APP/Contents/Resources/rise-control.sh"
 node --check "$APP/Contents/Resources/engine/scripts/injector.mjs"
 node "$APP/Contents/Resources/engine/scripts/injector.mjs" --check-payload --theme-dir "$APP/Contents/Resources/theme" > "$OUT/payload.json"
 codesign --verify --deep --strict "$APP"
-lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/RiseOnAir"
+lipo "$APP/Contents/MacOS/RiseOnAir" -verify_arch arm64 x86_64
 python3 "$ROOT/macos/tests/test-resources.py" "$APP" | tee "$OUT/resources.json"
 RISE_TEST_OUTPUT="$OUT" "$APP/Contents/MacOS/RiseOnAir" --self-test --muted
 python3 - "$OUT" <<'PY'
