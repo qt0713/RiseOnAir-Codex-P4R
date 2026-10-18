@@ -14,6 +14,8 @@ try {
  } elseif($Action -eq 'Manager'){
   & (Join-Path $engineScripts 'tray-dream-skin.ps1') -ShowWindow
  } else {
+  . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
+  Set-RiseSurfaceAdapter -StateRoot $record.stateRoot -InstallRoot $installRoot
   Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments @('-NoProfile','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $engineScripts 'start-dream-skin.ps1'),'-SavedThemeDirectory',$record.themeDirectory,'-RequireUnpaused','-PromptRestart') -LogPrefix (Join-Path $logDirectory 'start')
   [IO.File]::WriteAllText($readyFile,'ready')
  }

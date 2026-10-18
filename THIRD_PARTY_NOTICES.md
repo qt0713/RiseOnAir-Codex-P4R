@@ -17,3 +17,5 @@
 | HyperFrames | 制作过程中参考 [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) 的创意、时间轴和音轨工作流；发布动画使用本地 Web Animations API，不包含 GSAP 或 HyperFrames 执行文件。 |
 
 如需转载、商业使用或重新分发人物与录音，请分别核对相应权利来源；署名和链接不改变这些素材的权利归属。关于来源或署名的更正可通过仓库 Issue 提交。
+
+本项目 v1.0.1 对用户目录内 Dream Skin v1.5.21 的 injector.mjs 加入一个按主题 ID 加载本地 CSS 的适配入口。原 MIT 许可保持；修改源码与可逆安装脚本见 installer/Surface-Patch.ps1，样式见 src/runtime/rise-surfaces.css。该修改不属于上游官方发行版。

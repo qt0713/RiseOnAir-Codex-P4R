@@ -1,0 +1,19 @@
+/* Rise-only adapter for Codex Dream Skin 1.5.21. Injected only for this theme.
+   Paint one translucent surface; keep text fully opaque. */
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-response-annotation-conversation][data-response-annotation-target] {
+  background: var(--ds-theme-color-panel) !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  color: var(--ds-theme-color-text) !important;
+}
+
+/* Once finalized, this node is inside the existing message surface.
+   A second translucent fill would compound to an almost opaque panel. */
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-local-conversation-final-assistant]
+  [data-response-annotation-conversation][data-response-annotation-target] {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}

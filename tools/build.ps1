@@ -13,8 +13,9 @@ New-Item -ItemType Directory -Path $stage,$output,(Join-Path $stage 'scripts'),(
 Copy-Item -Path (Join-Path $root 'src\animation\*') -Destination $stage -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root 'assets\rise-on-air-icon-v2.ico') -Destination (Join-Path $stage 'rise-icon-v1.ico') -Force
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE'),(Join-Path $root 'THIRD_PARTY_NOTICES.md') -Destination $stage -Force
+Copy-Item -LiteralPath (Join-Path $root 'src\runtime') -Destination $stage -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root 'licenses') -Destination $stage -Recurse -Force
-foreach($file in @('Common.ps1','Theme-Control.ps1','Bootstrap.ps1')){
+foreach($file in @('Common.ps1','Theme-Control.ps1','Bootstrap.ps1','Surface-Patch.ps1')){
  $text=[IO.File]::ReadAllText((Join-Path $root ('installer\'+$file)))
  [IO.File]::WriteAllText((Join-Path $stage ('scripts\'+$file)),$text,(New-Object Text.UTF8Encoding($true)))
 }
@@ -43,7 +44,7 @@ if($StageOnly){Write-Output $stage;exit 0}
 if(-not $Compiler){$Compiler=Join-Path $root '.cache\inno\ISCC.exe'}
 & $Compiler ('/DBuildRoot='+$stage) ('/DOutputRoot='+$output) (Join-Path $root 'installer\RiseOnAir.iss')
 if($LASTEXITCODE -ne 0){throw 'Installer compilation failed.'}
-$installer=Join-Path $output 'RiseOnAir-Setup-v1.0.0-windows-x64.exe'
+$installer=Join-Path $output 'RiseOnAir-Setup-v1.0.1-windows-x64.exe'
 $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 ($hash+'  '+[IO.Path]::GetFileName($installer))|Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
 Write-Output $installer

@@ -44,8 +44,10 @@ if($Action -eq 'Install'){
  }
  . (Join-Path $engineScripts 'common-windows.ps1')
  . (Join-Path $engineScripts 'theme-windows.ps1')
+ . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
+ Set-RiseSurfaceAdapter -StateRoot $stateRoot -InstallRoot $InstallRoot
  $imported=Import-DreamSkinThemeZip -ArchivePath (Join-Path $InstallRoot 'theme.zip') -StateRoot $stateRoot
- $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.0';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
+ $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.1';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'integration.json'),($record|ConvertTo-Json -Depth 6),(New-Object Text.UTF8Encoding($false)))
  $appId=$package.PackageFamilyName+'!App'
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'CodexAppId.txt'),$appId)
@@ -55,6 +57,8 @@ if($Action -eq 'Install'){
  $record=Read-RiseIntegration -InstallRoot $InstallRoot
  $env:LOCALAPPDATA=Split-Path -Parent $record.stateRoot
  Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments @('-NoProfile','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $record.stateRoot 'engine\scripts\restore-dream-skin.ps1'),'-RestoreBaseTheme','-ForceRestart') -LogPrefix (Join-Path $logDirectory 'uninstall-restore')
+ . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
+ Set-RiseSurfaceAdapter -StateRoot $record.stateRoot -InstallRoot $InstallRoot -Remove
 } else {
  $record=Read-RiseIntegration -InstallRoot $InstallRoot
  $env:LOCALAPPDATA=Split-Path -Parent $record.stateRoot
