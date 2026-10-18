@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "p4r-rise-on-air",
+  "name": "Rise On Air · 理世频道",
+  "brandSubtitle": "RISE ON AIR",
+  "tagline": "准备好，一起开始吧。",
+  "projectPrefix": "选择项目 · ",
+  "projectLabel": "选择项目",
+  "statusText": "CH.04 · ON AIR",
+  "quote": "理世为你接通信号",
+  "image": "background.png",
+  "appearance": "auto",
+  "art": {
+    "focusX": 0.79,
+    "focusY": 0.48,
+    "safeArea": "left",
+    "taskMode": "ambient"
+  },
+  "colors": {
+    "accent": "#FFD83D",
+    "accentAlt": "#EF6C91",
+    "secondary": "#EF6C91",
+    "highlight": "#FFD83D"
+  }
+}
