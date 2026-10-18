@@ -13,12 +13,22 @@ const fs=require('fs'),path=require('path'),{pathToFileURL}=require('url');
   await page.emulateMedia({colorScheme:scheme});await page.setViewportSize({width,height:900});
   await page.setContent(`<!doctype html><html style="color-scheme:${scheme}"><head><style>body{margin:0;font:16px system-ui}aside{display:none}main{min-height:100vh}.thread-scroll-container{padding:24px;max-width:760px;margin:auto}h1{font-size:24px}.fixture{margin:16px 0}p{line-height:1.7}</style></head><body><aside class="app-shell-left-panel"></aside><main class="main-surface"><header class="app-header-tint"></header><div class="thread-scroll-container"><h1>RISE ON AIR · 半透明消息表面</h1><section class="fixture"><h2>正在处理</h2><div id="reasoning" data-response-annotation-conversation="fixture" data-response-annotation-target="fixture"><p>正在整理主题样式。思考过程与最终回复使用同一层半透明底色，背景图仍可见，文字保持清晰。</p></div></section><section class="fixture"><h2>最终回复</h2><div id="final" data-local-conversation-final-assistant="true"><div id="nested" data-response-annotation-conversation="fixture" data-response-annotation-target="fixture"><p>主题样式已统一。内容完成后，内层背景清空，避免多层透明底色叠加。</p></div></div></section><div class="composer-surface-chrome"><div contenteditable="true">输入区域</div></div></div></main></body></html>`);
   await page.evaluate(payload);
+  await page.evaluate(()=>{
+   const thread=document.querySelector('.thread-scroll-container');
+   const tools=document.createElement('div');tools.id='tools';tools.setAttribute('data-local-conversation-item-target-ids','fixture');
+   tools.innerHTML='<div class="group/activity-header"><button aria-expanded="false">编辑了文件运行了命令</button></div><details id="tool-details"><summary>已查看 1 张图像</summary><p>本地预览检查完成。</p></details>';
+   thread.insertBefore(tools,document.querySelector('.composer-surface-chrome'));
+   const composer=document.querySelector('.composer-surface-chrome');
+   composer.insertAdjacentHTML('beforeend','<button id="steer" class="bg-composer-primary" type="submit" aria-label="立即引导"><svg style="color:#4c2263" width="24" height="24"><path fill="currentColor" d="M11 20V8l-4 4-1-1 6-6 6 6-1 1-4-4v12z"/></svg></button>');
+  });
   await page.waitForFunction(()=>document.querySelector('#final').dataset.dsPart==='message');
   const state=await page.evaluate(()=>{
    const read=id=>{const s=getComputedStyle(document.getElementById(id));const c=new OffscreenCanvas(1,1).getContext('2d');c.fillStyle=s.backgroundColor;c.fillRect(0,0,1,1);return {background:s.backgroundColor,rgba:[...c.getImageData(0,0,1,1).data],image:s.backgroundImage,blur:s.backdropFilter,opacity:s.opacity}};
-   return {reasoning:read('reasoning'),final:read('final'),nested:read('nested'),overflow:document.documentElement.scrollWidth>innerWidth};
+   return {reasoning:read('reasoning'),final:read('final'),nested:read('nested'),tools:read('tools'),steer:read('steer'),icon:getComputedStyle(document.querySelector('#steer svg')).color,overflow:document.documentElement.scrollWidth>innerWidth};
   });
   if(state.reasoning.rgba.some((v,i)=>Math.abs(v-state.final.rgba[i])>1)||state.reasoning.rgba[3]!==179||state.reasoning.image!=='none'||state.reasoning.blur!=='none'||state.nested.rgba[3]!==0||state.reasoning.opacity!=='1'||state.overflow)throw Error(JSON.stringify({scheme,width,state}));
+  if(state.tools.rgba.some((v,i)=>Math.abs(v-state.final.rgba[i])>1)||state.tools.image!=='none'||state.tools.blur!=='none'||state.steer.background!=='rgb(255, 216, 61)'||state.icon!=='rgb(36, 33, 36)')throw Error(JSON.stringify({scheme,width,state}));
+  await page.locator('#tool-details').evaluate(el=>{el.open=true});
   await page.locator('#reasoning').evaluate(el=>{el.hidden=true;el.hidden=false});
   if(scheme==='light'&&width===1280)await page.screenshot({path:path.join(root,'docs/reasoning-surfaces.png')});
   results.push({scheme,width,...state});

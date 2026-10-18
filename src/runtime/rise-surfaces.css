@@ -1,6 +1,8 @@
 /* Rise-only adapter for Codex Dream Skin 1.5.21. Injected only for this theme.
    Paint one translucent surface; keep text fully opaque. */
 html[data-dream-skin="active"] .thread-scroll-container
+  [data-local-conversation-item-target-ids],
+html[data-dream-skin="active"] .thread-scroll-container
   [data-response-annotation-conversation][data-response-annotation-target] {
   background: var(--ds-theme-color-panel) !important;
   backdrop-filter: none !important;
@@ -12,8 +14,37 @@ html[data-dream-skin="active"] .thread-scroll-container
    A second translucent fill would compound to an almost opaque panel. */
 html[data-dream-skin="active"] .thread-scroll-container
   [data-local-conversation-final-assistant]
+  [data-local-conversation-item-target-ids],
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-local-conversation-item-target-ids] [data-local-conversation-item-target-ids],
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-response-annotation-conversation][data-response-annotation-target]
+  [data-local-conversation-item-target-ids],
+html[data-dream-skin="active"] .thread-scroll-container
+  [data-local-conversation-final-assistant]
   [data-response-annotation-conversation][data-response-annotation-target] {
   background: transparent !important;
   backdrop-filter: none !important;
   box-shadow: none !important;
+}
+
+/* Native steering/queue send actions do not use the old exact Send label.
+   Target primary composer controls by their native surface contract. */
+html[data-dream-skin="active"] [data-ds-part="composer"] {
+  --color-background-composer-primary: #ffd83d;
+  --color-text-composer-primary: #242124;
+}
+html[data-dream-skin="active"] [data-ds-part="composer"]
+  button:is([class~="bg-composer-primary"], [class~="bg-primary-solid"], [type="submit"]) {
+  --ds-text: #242124;
+  --ds-on-accent: #242124;
+  --color-text-primary: #242124;
+  background: #ffd83d !important;
+  color: #242124 !important;
+}
+html[data-dream-skin="active"] [data-ds-part="composer"]
+  button:is([class~="bg-composer-primary"], [class~="bg-primary-solid"], [type="submit"]) svg,
+html[data-dream-skin="active"] [data-ds-part="composer"]
+  button:is([class~="bg-composer-primary"], [class~="bg-primary-solid"], [type="submit"]) * {
+  color: #242124 !important;
 }
