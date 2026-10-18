@@ -38,8 +38,8 @@ GitHub Actions 在 `macos-15`（Apple Silicon）和 `macos-15-intel` 上编译 U
 
 ## 本次发布的实际结果
 
-[macOS 原生构建与测试 run 39154975938](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39154975938) 已通过。Apple Silicon 与 Intel 均在 macOS 15.7.9 上运行：原生 WKWebView 播放 3.2 秒并结束、音频元数据与播放启动正常、截图成功，资源与配置保护检查通过；Universal 双架构检查、ad-hoc 签名校验和 DMG 只读挂载验证通过。
+[macOS 原生构建与测试 run 39155338626](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39155338626) 已通过。Apple Silicon 与 Intel 均在 macOS 15.7.9 上运行：原生 WKWebView 播放 3.2 秒并结束、音频元数据与播放启动正常、截图成功，资源与配置保护检查通过；Universal 双架构检查、ad-hoc 签名校验和 DMG 只读挂载验证通过。
 
 ![Mac runner 原生窗口播放截图](macos-native-preview.png)
 
-构建来源为提交 `9232e3e505663266526f96b9a9de41d24ac3f8f0`；后续提交只补充测试记录与文档。下载包来自通过测试的 Apple Silicon runner，同一 Universal 二进制同时包含 arm64 与 x86_64。Intel runner 另行构建并运行了原生测试。
+构建来源为提交 `b1c2264be04f5c8bfdd311e3eb340c31df2bd518`；后续提交只补充测试记录与文档。下载包来自通过测试的 Apple Silicon runner，同一 Universal 二进制同时包含 arm64 与 x86_64。Intel runner 另行构建并运行了原生测试。

@@ -38,6 +38,6 @@
 补充工具摘要 data-local-conversation-item-target-ids 的半透明背景，移除原有渐变及 18px 模糊。覆盖运行中原生 bg-composer-primary 提交按钮及图标颜色，使用 #FFD83D 背景和 #242124 前景。深浅色 × 390/1280 px 的四组回归新增工具摘要、展开详情和引导发送箭头校验；不调用按钮提交动作，不更改消息或输入。
 ## macOS 1.1.0-beta.1
 
-[Apple Silicon / Intel 原生 CI](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39154975938) 全部通过，Mac 系统版本为 15.7.9。Universal 编译、双架构存在、应用 ad-hoc 签名、WKWebView 3.2 秒动画、音频加载及开始播放、预览截图、资源摘要、缺少官方应用拒绝安装、原配置保留、符号链接拒绝、DMG 挂载和包内签名校验均通过。
+[Apple Silicon / Intel 原生 CI](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39155338626) 全部通过，Mac 系统版本为 15.7.9。Universal 编译、双架构存在、应用 ad-hoc 签名、WKWebView 3.2 秒动画、音频加载及开始播放、预览截图、资源摘要、缺少官方应用拒绝安装、原配置保留、符号链接拒绝、DMG 挂载和包内签名校验均通过。
 
 发布包没有经过 Apple Developer ID 公证，且未在登录用户的真实 Codex 会话中验收主题加载/恢复；不能把原生播放器自测等同于主题接入成功。详见 [macOS 说明](MACOS.md)。本次不改动现有 Windows 安装。
