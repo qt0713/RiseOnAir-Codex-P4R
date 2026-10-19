@@ -20,6 +20,7 @@ namespace RiseOnAir {
   public static readonly string Home=AppDomain.CurrentDomain.BaseDirectory;
   public static bool Preview;
   public static bool Muted;
+  public static bool ExistingSession;
   static string launchToken;
   static readonly object LogLock=new object();
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
@@ -50,17 +51,17 @@ namespace RiseOnAir {
    if(!File.Exists(Path.Combine(Home,"integration.json")))return true;
    try {return launchToken!=null && File.ReadAllText(Path.Combine(Home,"LaunchReady.flag")).Trim()==launchToken;}catch{return false;}
   }
-  static Process ThemeProcess(bool login) {
+  static Process ThemeProcess(bool login,bool background) {
    launchToken=Guid.NewGuid().ToString("N");
    var shell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),@"System32\WindowsPowerShell\v1.0\powershell.exe");
    var script=Path.Combine(Home,"scripts","Theme-Control.ps1");
-   return Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+script+"\" -Action "+(login?"Login":"Apply")+" -LaunchToken "+launchToken) {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
+   return Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+script+"\" -Action "+(login?"Login":"Apply")+" -LaunchToken "+launchToken+(background?" -Background":"")) {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
   }
   public static void OpenCodex() {
    var themeScript=Path.Combine(Home,"scripts","Theme-Control.ps1");
    if(File.Exists(themeScript)&&File.Exists(Path.Combine(Home,"integration.json"))) {
     var ready=Path.Combine(Home,"LaunchReady.flag");if(File.Exists(ready))File.Delete(ready);
-    using(var process=ThemeProcess(false)) { }
+    using(var process=ThemeProcess(false,ExistingSession)) { }
     Log("theme-activation-requested");return;
    }
    var appId=File.ReadAllText(Path.Combine(Home,"CodexAppId.txt")).Trim();
@@ -72,21 +73,18 @@ namespace RiseOnAir {
    Preview=args.Contains("--preview") || args.Contains("--self-test");
    Muted=args.Contains("--muted");
    Log("begin preview="+Preview+" muted="+Muted);
+   if(args.Contains("--login")) {
+    bool loginOwns;
+    using(var loginMutex=new Mutex(true,"Local\\RiseOnAir.Login",out loginOwns)) {
+     if(!loginOwns)return 0;
+     try {using(var process=ThemeProcess(true,true)){process.WaitForExit();return process.ExitCode;}}catch(Exception ex){Log("login-error "+ex.Message);return 1;}
+    }
+   }
    bool owns;
    using(var mutex=new Mutex(true,"Local\\RiseOnAir.Codex.Launcher",out owns)) {
     if(!owns) { Activate(FindWindow(null,"Codex · Rise On Air"));Log("duplicate-launch-ignored");return 0; }
-    if(args.Contains("--login")) {
-     try {using(var process=ThemeProcess(true)){process.WaitForExit();return process.ExitCode;}}catch(Exception ex){Log("login-error "+ex.Message);return 1;}
-    }
-    if(!Preview) {
-     var existing=CodexWindow();
-     if(existing!=IntPtr.Zero) {
-      // A native window alone is not evidence of a verified themed session.
-      try {using(var process=ThemeProcess(false)){process.WaitForExit();Log("existing-theme-check exit="+process.ExitCode);}}
-      catch(Exception ex){Log("existing-theme-error "+ex.Message);}
-      Activate(CodexWindow());return 0;
-     }
-    }
+    ExistingSession=!Preview && CodexWindow()!=IntPtr.Zero;
+    Log("manual-intro existing="+ExistingSession);
     try {
      var app=new Application {ShutdownMode=ShutdownMode.OnMainWindowClose};
      app.DispatcherUnhandledException+=(sender,eventArgs)=>{Log("unhandled "+eventArgs.Exception.Message);eventArgs.Handled=true;app.Shutdown(1);};

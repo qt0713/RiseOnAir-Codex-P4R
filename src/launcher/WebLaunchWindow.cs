@@ -81,6 +81,9 @@ namespace RiseOnAir {
   void Script(string code){if(browser.CoreWebView2!=null&&!closing)browser.CoreWebView2.ExecuteScriptAsync(code);}
   void Finish(string reason) {
    if(closing||waiting||introFinished)return;introFinished=true;Program.Log("finish "+reason);
+   if(Program.ExistingSession && Program.CodexWindow()!=IntPtr.Zero) {
+    Program.Log("handoff-existing-window theme-check-continues");FadeClose();return;
+   }
    if(Program.Preview||reason=="skip"||Program.IsReady()){FadeClose();return;}
    playing=false;waiting=true;waitStart=lifetime.Elapsed.TotalSeconds;Script("showWaiting(false)");
   }

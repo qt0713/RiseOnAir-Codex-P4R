@@ -12,9 +12,10 @@ function Set-RiseWindowRelaunch {
   try {
    if($p.MainWindowHandle -eq [IntPtr]::Zero -or $p.Path -ine $expected){continue}
    $hwnd=$p.MainWindowHandle.ToInt64()
-   # A distinct identity avoids Shell canonicalizing the wrapper to AppsFolder.
+   # Keep the native app separate from the launcher pin: otherwise Shell
+   # activates its running window and never executes the animation launcher.
    # Relaunch display name and command must be set together (Microsoft contract).
-   $values=@{2=('"'+(Join-Path $InstallRoot 'RiseOnAir.exe')+'"');3=((Join-Path $InstallRoot 'rise-icon-v1.ico')+',0');4='Codex - Rise On Air';5='qt0713.RiseOnAir.Codex'}
+   $values=@{2=('"'+(Join-Path $InstallRoot 'RiseOnAir.exe')+'"');3=((Join-Path $InstallRoot 'rise-icon-v1.ico')+',0');4='Codex - Rise On Air';5=($Record.codexPackageFamily+'!App')}
    foreach($id in @(2,3,4,5)){
     $value=if($Remove){$null}else{$values[$id]}
     [RiseOnAir.ShellIdentity]::Write($null,$hwnd,$id,$value)

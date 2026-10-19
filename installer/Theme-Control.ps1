@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([ValidateSet('Apply','Login','Restore','Manager')][string]$Action='Apply',[ValidatePattern('^[a-f0-9]{32}$')][string]$LaunchToken)
+param([ValidateSet('Apply','Login','Restore','Manager')][string]$Action='Apply',[ValidatePattern('^[a-f0-9]{32}$')][string]$LaunchToken,[switch]$Background)
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $installRoot=Split-Path -Parent $PSScriptRoot
 $record=Read-RiseIntegration -InstallRoot $installRoot
@@ -12,7 +12,8 @@ $controlLock=$null
 try {
  if($Action -ne 'Manager'){
   $controlLock=New-Object Threading.Mutex($false,'Local\RiseOnAir.ThemeControl')
-  try {$acquired=$controlLock.WaitOne(60000)} catch [Threading.AbandonedMutexException] {$acquired=$true}
+  try {$acquired=$controlLock.WaitOne($(if($Background){0}else{60000}))} catch [Threading.AbandonedMutexException] {$acquired=$true}
+  if(-not $acquired -and $Background){$controlLock.Dispose();$controlLock=$null;exit 0}
   if(-not $acquired){$controlLock.Dispose();$controlLock=$null;throw 'Another theme operation is still running.'}
  }
  if($Action -eq 'Restore'){

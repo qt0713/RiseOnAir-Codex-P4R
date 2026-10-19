@@ -1,4 +1,4 @@
-#ifndef BuildRoot
+﻿#ifndef BuildRoot
  #error BuildRoot is required
 #endif
 #ifndef OutputRoot
@@ -7,7 +7,7 @@
 [Setup]
 AppId={{3E824C17-87A2-41C7-A45D-5C253B1DABF5}
 AppName=Rise On Air · 理世主题
-AppVersion=1.0.3
+AppVersion=1.0.4
 AppPublisher=qt0713
 AppPublisherURL=https://github.com/qt0713/RiseOnAir-Codex-P4R
 AppSupportURL=https://github.com/qt0713/RiseOnAir-Codex-P4R/issues
@@ -22,10 +22,10 @@ WizardStyle=modern
 Compression=lzma2/normal
 SolidCompression=yes
 OutputDir={#OutputRoot}
-OutputBaseFilename=RiseOnAir-Setup-v1.0.3-windows-x64
+OutputBaseFilename=RiseOnAir-Setup-v1.0.4-windows-x64
 SetupIconFile={#BuildRoot}\rise-icon-v1.ico
 UninstallDisplayIcon={app}\rise-icon-v1.ico
-VersionInfoVersion=1.0.3.0
+VersionInfoVersion=1.0.4.0
 VersionInfoDescription=Rise On Air · 理世主题安装包
 VersionInfoProductName=Rise On Air
 ChangesAssociations=yes
