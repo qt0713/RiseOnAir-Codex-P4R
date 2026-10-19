@@ -22,12 +22,25 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func applicationDidFinishLaunching(_ notification: Notification) {
         selfTest = args.contains("--self-test")
         preview = selfTest || args.contains("--preview")
+        if args.contains("--login") {
+            NSApp.setActivationPolicy(.accessory)
+            runControl("login") { _ in NSApp.terminate(nil) }; return
+        }
         setupMenu()
         let installed = try? String(contentsOf: support.appendingPathComponent("installed-version"), encoding: .utf8)
         let version = try? String(contentsOf: resources.appendingPathComponent("VERSION"), encoding: .utf8)
         if !preview && installed == version && installed != nil,
            let codex = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first {
-            codex.activate(options: [.activateAllWindows]); NSApp.terminate(nil); return
+            // A running native app can be missing the managed CDP session.
+            runControl("launch") { success in
+                codex.activate(options: [.activateAllWindows])
+                if !success {
+                    let alert = NSAlert(); alert.messageText = "理世主题尚未通过验证"
+                    alert.informativeText = "已保留当前 Codex 会话。请保存输入后退出 Codex，再打开理世启动器；日志位于 Library/Application Support/RiseOnAir。"
+                    alert.runModal()
+                }
+                NSApp.terminate(nil)
+            }; return
         }
         if !preview && installed != version {
             let alert = NSAlert()
@@ -127,7 +140,10 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             process = task; try task.run()
         } catch {
             process = nil
-            let alert = NSAlert(); alert.messageText = "无法执行主题操作"; alert.informativeText = error.localizedDescription; alert.runModal(); completion(false)
+            if !args.contains("--login") {
+                let alert = NSAlert(); alert.messageText = "无法执行主题操作"; alert.informativeText = error.localizedDescription; alert.runModal()
+            }
+            completion(false)
         }
     }
     func applyTheme() {

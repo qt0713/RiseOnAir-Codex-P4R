@@ -1,12 +1,20 @@
 # macOS 下载与使用
 
-macOS 首发版为 **1.1.0-beta.1**，提供 Universal 原生应用（Apple Silicon / Intel），最低 macOS 14。
+macOS 当前版为 **1.1.0-beta.2**，提供 Universal 原生应用（Apple Silicon / Intel），最低 macOS 14。
 
 ## 安装
 
 1. 先安装并运行官方 Codex / 新版 ChatGPT 桌面客户端一次，再退出。主题引擎要求官方包 ID `com.openai.codex`，并校验其应用签名、OpenAI Team ID 和自带 Node 运行时；缺少合格运行时会停止，不会要求安装 Homebrew 或来历不明的 Node。
-2. 下载 `RiseOnAir-v1.1.0-beta.1-macos-universal.dmg`，打开后把 **Rise On Air.app** 拖入 Applications。也提供 ZIP 作为替代。
-3. 打开 Rise On Air，按原生提示安装并启动。首次配置前请保存输入并退出官方客户端；后续官方客户端已经运行时，启动器直接唤起。
+2. 下载 `RiseOnAir-v1.1.0-beta.2-macos-universal.dmg`，打开后把 **Rise On Air.app** 拖入 Applications。也提供 ZIP 作为替代。
+3. 打开 Rise On Air，按原生提示安装并启动。首次配置或引擎升级前请保存输入并退出官方客户端；后续客户端已经运行时，仍会验证并应用主题，再唤起窗口。
+
+## 登录恢复与 Dock 入口
+
+安装后创建当前用户登录项 `~/Library/LaunchAgents/io.github.qt0713.riseonair.login.plist`。下一次登录时，原生启动器以 `--login` 静默建立主题会话，同时打开 Codex；不播放动画、不弹 Terminal、不自动重启已有客户端。若官方客户端抢先以普通模式启动，后台操作记录失败并保留工作，需保存后退出官方客户端、从 Rise On Air 重新启动。
+
+Dock 日常冷启动请固定 **Rise On Air.app**。登录恢复成功后，点击官方 Codex 的 Dock 图标会唤起已有主题会话；本项目不修改官方 Dock 应用包，也不能给任意普通启动补加 CDP 参数。关闭登录项、手动完全退出后直接冷启动官方图标，仍属于普通入口。系统禁止后台项目时需按系统设置自行允许。
+
+“恢复官方外观”会移除本项目登录项。登录项指向安装位置，移动应用后请从新位置打开一次完成注册；不要从挂载中的 DMG 安装主题。
 
 本项目没有 Apple Developer ID 和公证资格，构建使用 ad-hoc 完整性签名。Gatekeeper 可能阻止首次打开：请由你自行按照系统的“隐私与安全性”提示处理。不要关闭 Gatekeeper，不需要执行删除隔离属性的命令。
 
@@ -36,7 +44,7 @@ GitHub Actions 在 `macos-15`（Apple Silicon）和 `macos-15-intel` 上编译 U
 
 角色、录音、字体、上游引擎的来源和许可见根目录 `THIRD_PARTY_NOTICES.md`。这不是 OpenAI、ATLUS 或 SEGA 官方产品。
 
-## 本次发布的实际结果
+## beta.1 的历史测试结果
 
 [macOS 原生构建与测试 run 39155338626](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39155338626) 已通过。Apple Silicon 与 Intel 均在 macOS 15.7.9 上运行：原生 WKWebView 播放 3.2 秒并结束、音频元数据与播放启动正常、截图成功，资源与配置保护检查通过；Universal 双架构检查、ad-hoc 签名校验和 DMG 只读挂载验证通过。
 

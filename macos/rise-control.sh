@@ -13,7 +13,45 @@ safe_path() {
   done
 }
 safe_path "$SUPPORT"
+LOGIN_PLIST="$HOME/Library/LaunchAgents/io.github.qt0713.riseonair.login.plist"
+xml_escape() { /usr/bin/sed -e 's/\&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+register_login() {
+  safe_path "$LOGIN_PLIST"
+  if [ -f "$LOGIN_PLIST" ]; then
+    /usr/bin/grep -q '<key>RiseOnAirManaged</key>' "$LOGIN_PLIST" || { printf '登录项路径已由其他文件占用。\n' >&2; return 1; }
+  fi
+  /bin/mkdir -p "$(/usr/bin/dirname "$LOGIN_PLIST")"
+  local executable log staged
+  executable="$(printf '%s' "${RESOURCES%/Resources}/MacOS/RiseOnAir" | xml_escape)"
+  log="$(printf '%s' "$SUPPORT/login.log" | xml_escape)"
+  staged="$(/usr/bin/mktemp "${LOGIN_PLIST}.XXXXXX")"
+  /bin/cat > "$staged" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>io.github.qt0713.riseonair.login</string>
+<key>RiseOnAirManaged</key><true/>
+<key>ProgramArguments</key><array><string>$executable</string><string>--login</string></array>
+<key>RunAtLoad</key><true/><key>KeepAlive</key><false/>
+<key>StandardOutPath</key><string>$log</string>
+<key>StandardErrorPath</key><string>$log</string>
+</dict></plist>
+PLIST
+  /usr/bin/plutil -lint "$staged" >/dev/null
+  /bin/chmod 600 "$staged"
+  /bin/mv -f "$staged" "$LOGIN_PLIST"
+}
+remove_login() {
+  safe_path "$LOGIN_PLIST"
+  if [ -f "$LOGIN_PLIST" ]; then
+    /usr/bin/grep -q '<key>RiseOnAirManaged</key>' "$LOGIN_PLIST" || return 1
+    /bin/launchctl bootout "gui/$(/usr/bin/id -u)/io.github.qt0713.riseonair.login" 2>/dev/null || true
+    /bin/rm -f "$LOGIN_PLIST"
+  fi
+}
 case "$ACTION" in
+  register-login) register_login; exit ;;
+  remove-login) remove_login; exit ;;
   preflight)
     . "$RESOURCES/engine/scripts/common-macos.sh"
     discover_codex_app
@@ -62,6 +100,7 @@ case "$ACTION" in
       fail '主题初始化失败；请查看日志并重试。'
     fi
     /bin/cp "$RESOURCES/VERSION" "$SUPPORT/installed-version"
+    register_login
     printf 'Rise On Air installed.\n' ;;
   launch)
     if [ ! -f "$SUPPORT/installed-version" ] || ! /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version"; then
@@ -69,9 +108,17 @@ case "$ACTION" in
     fi
     "$ENGINE/scripts/start-dream-skin-macos.sh" --prompt-restart
     "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json"
+    register_login
     printf 'Rise theme verified.\n' ;;
+  login)
+    # Never install, ask for restart or close an existing session at login.
+    [ -f "$SUPPORT/installed-version" ] && /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version" || exit 1
+    [ -f "$ENGINE/RISE-OWNED" ] || exit 1
+    "$ENGINE/scripts/start-dream-skin-macos.sh"
+    exec "$ENGINE/scripts/verify-dream-skin-macos.sh" ;;
   restore)
     [ -f "$ENGINE/RISE-OWNED" ] || { printf '未发现本项目已安装的引擎。\n' >&2; exit 1; }
+    remove_login
     exec "$ENGINE/scripts/restore-dream-skin-macos.sh" --restore-base-theme --restart-codex ;;
   verify)
     [ -f "$ENGINE/RISE-OWNED" ] || exit 1

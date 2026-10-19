@@ -36,6 +36,24 @@ with tempfile.TemporaryDirectory(prefix="rise-macos-test-") as temporary:
     assert result.returncode != 0 and b"Could not find the official" in result.stderr
     assert not (home / "Library/Application Support/RiseOnAir/engine").exists()
     assert config.read_bytes() == before
+    # Exercise the real login-item writer with XML metacharacters in HOME.
+    import plistlib
+    login_home = home / 'login & <test>'
+    login_home.mkdir()
+    login_env = dict(env, HOME=str(login_home))
+    control = ["/bin/bash", str(r / "rise-control.sh")]
+    subprocess.run(control + ["register-login"], env=login_env, check=True, capture_output=True)
+    plist = login_home / "Library/LaunchAgents/io.github.qt0713.riseonair.login.plist"
+    data = plistlib.loads(plist.read_bytes())
+    assert data["ProgramArguments"] == [str(app / "Contents/MacOS/RiseOnAir"), "--login"]
+    assert data["RunAtLoad"] and not data["KeepAlive"]
+    assert data["StandardOutPath"] == str(login_home / "Library/Application Support/RiseOnAir/login.log")
+    subprocess.run(control + ["register-login"], env=login_env, check=True, capture_output=True)
+    assert plistlib.loads(plist.read_bytes()) == data
+    result = subprocess.run(control + ["login"], env=login_env, capture_output=True, timeout=10)
+    assert result.returncode != 0 and not (login_home / "Library/Application Support/RiseOnAir/engine").exists()
+    subprocess.run(control + ["remove-login"], env=login_env, check=True, capture_output=True)
+    assert not plist.exists()
     support = home / "Library/Application Support/RiseOnAir"
     if support.exists():
         import shutil
@@ -48,4 +66,4 @@ with tempfile.TemporaryDirectory(prefix="rise-macos-test-") as temporary:
     assert result.returncode != 0
     assert not list(outside.iterdir())
     assert config.read_bytes() == before
-print(json.dumps({"manifest":True,"isolatedState":True,"missingOfficialAppRejected":True,"configPreserved":True,"symlinkRejected":True}))
+print(json.dumps({"manifest":True,"isolatedState":True,"missingOfficialAppRejected":True,"configPreserved":True,"symlinkRejected":True,"loginPlistRoundTrip":True,"quietLoginNoInstall":True}))
