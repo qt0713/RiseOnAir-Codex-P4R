@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([ValidateSet('Apply','Login','Restore','Manager')][string]$Action='Apply',[ValidatePattern('^[a-f0-9]{32}$')][string]$LaunchToken,[switch]$Background)
+param([ValidateSet('Apply','Login','Restore','Manager')][string]$Action='Apply',[ValidatePattern('^[a-f0-9]{32}$')][string]$LaunchToken,[switch]$Background,[long]$NativeWindow=0)
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $installRoot=Split-Path -Parent $PSScriptRoot
 $record=Read-RiseIntegration -InstallRoot $installRoot
@@ -27,7 +27,7 @@ try {
   Set-RiseSurfaceAdapter -StateRoot $record.stateRoot -InstallRoot $installRoot
   $startArguments=@('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $engineScripts 'start-dream-skin.ps1'),'-SavedThemeDirectory',$record.themeDirectory,'-RequireUnpaused')
   # Login is silent and never authorizes closing an existing user session.
-  if($Action -ne 'Login'){$startArguments+='-PromptRestart'}
+  if($Action -ne 'Login' -and -not $Background){$startArguments+='-PromptRestart'}
   Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments $startArguments -LogPrefix (Join-Path $logDirectory 'start')
   # Windows upstream returns zero when its native restart prompt is cancelled.
   # Verify the current Browser ID and renderer instead of trusting that exit.
@@ -35,7 +35,7 @@ try {
   $active=Get-Content -LiteralPath (Join-Path $record.stateRoot 'active-theme\theme.json') -Raw -Encoding UTF8|ConvertFrom-Json
   if($active.id -ne 'p4r-rise-on-air'){throw 'The verified active theme is not Rise On Air.'}
   . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
-  Set-RiseWindowRelaunch -InstallRoot $installRoot -Record $record
+  Set-RiseWindowRelaunch -InstallRoot $installRoot -Record $record -NativeWindow $NativeWindow
   if(Test-Path -LiteralPath (Join-Path $logDirectory 'last-error.txt')){Remove-Item -LiteralPath (Join-Path $logDirectory 'last-error.txt')}
   if($LaunchToken){[IO.File]::WriteAllText($readyFile,$LaunchToken)}
  }

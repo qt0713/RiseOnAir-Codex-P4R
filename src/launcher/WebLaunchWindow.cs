@@ -71,6 +71,8 @@ namespace RiseOnAir {
   void Tick() {
    if(closing)return;
    if(waiting) {
+    if(Program.ExistingSession&&Program.ResumeCompleted&&Program.CodexWindow()!=IntPtr.Zero){Program.Log("handoff-resumed-window theme-check-continues");FadeClose();return;}
+    if(Program.ResumeFailed&&!waitNoticeShown){waitNoticeShown=true;Script("showWaiting(true)");}
     if(Program.IsReady()){FadeClose();return;}
     if(lifetime.Elapsed.TotalSeconds-waitStart>45&&!waitNoticeShown){waitNoticeShown=true;Script("showWaiting(true)");}return;
    }
@@ -80,12 +82,15 @@ namespace RiseOnAir {
   }
   void Script(string code){if(browser.CoreWebView2!=null&&!closing)browser.CoreWebView2.ExecuteScriptAsync(code);}
   void Finish(string reason) {
-   if(closing||waiting||introFinished)return;introFinished=true;Program.Log("finish "+reason);
-   if(Program.ExistingSession && Program.CodexWindow()!=IntPtr.Zero) {
+   // Esc must also work after the animation has entered the waiting state.
+   if(closing)return;
+   if(reason=="skip"){Program.Log("finish skip");FadeClose();return;}
+   if(waiting||introFinished)return;introFinished=true;Program.Log("finish "+reason);
+   if(Program.ExistingSession && Program.ResumeCompleted && Program.CodexWindow()!=IntPtr.Zero) {
     Program.Log("handoff-existing-window theme-check-continues");FadeClose();return;
    }
    if(Program.Preview||reason=="skip"||Program.IsReady()){FadeClose();return;}
-   playing=false;waiting=true;waitStart=lifetime.Elapsed.TotalSeconds;Script("showWaiting(false)");
+   playing=false;waiting=true;waitStart=lifetime.Elapsed.TotalSeconds;Script(Program.ResumeFailed?"showWaiting(true)":"showWaiting(false)");
   }
   void FadeClose() {
    if(closing)return;closing=true;timer.Stop();

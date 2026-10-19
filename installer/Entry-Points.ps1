@@ -3,17 +3,18 @@ function Import-RiseShellIdentity {
  if(-not ('RiseOnAir.ShellIdentity' -as [type])){Add-Type -Path (Join-Path $PSScriptRoot 'ShellIdentity.cs')}
 }
 function Set-RiseWindowRelaunch {
- param([string]$InstallRoot,[object]$Record,[switch]$Remove)
+ param([string]$InstallRoot,[object]$Record,[switch]$Remove,[long]$NativeWindow=0)
  Import-RiseShellIdentity
  $pkg=Get-AppxPackage -Name OpenAI.Codex|Select-Object -First 1
  if(-not $pkg -or $pkg.SignatureKind -ne 'Store'){throw 'Registered official Codex is required.'}
  $expected=Join-Path $pkg.InstallLocation 'app\ChatGPT.exe'
  $bridge=Join-Path $InstallRoot 'RiseIconBridge.exe'
  if($Remove -and (Test-Path -LiteralPath $bridge)){Invoke-RiseProcess -File $bridge -Arguments @('--stop')}
- foreach($p in Get-Process -Name ChatGPT -ErrorAction SilentlyContinue){
+ $targets=if($NativeWindow){Get-Process -Id ([RiseOnAir.ShellIdentity]::WindowProcess($NativeWindow)) -ErrorAction Stop}else{Get-Process -Name ChatGPT -ErrorAction SilentlyContinue}
+ foreach($p in $targets){
   try {
-   if($p.MainWindowHandle -eq [IntPtr]::Zero -or $p.Path -ine $expected){continue}
-   $hwnd=$p.MainWindowHandle.ToInt64()
+   $hwnd=if($NativeWindow){$NativeWindow}else{$p.MainWindowHandle.ToInt64()}
+   if(-not $hwnd -or $p.Path -ine $expected -or [RiseOnAir.ShellIdentity]::WindowProcess($hwnd) -ne $p.Id){continue}
    # Keep the native app separate from the launcher pin: otherwise Shell
    # activates its running window and never executes the animation launcher.
    # Relaunch display name and command must be set together (Microsoft contract).
@@ -23,7 +24,8 @@ function Set-RiseWindowRelaunch {
     [RiseOnAir.ShellIdentity]::Write($null,$hwnd,$id,$value)
    }
    if(-not $Remove -and (Test-Path -LiteralPath $bridge)){
-    $arguments=@([string]$p.Id,[string]$p.StartTime.ToUniversalTime().Ticks,('"'+$expected+'"')) -join ' '
+    if($NativeWindow){Invoke-RiseProcess -File $bridge -Arguments @('--stop')}
+    $arguments=@([string]$p.Id,[string]$p.StartTime.ToUniversalTime().Ticks,('"'+$expected+'"'),[string]$hwnd) -join ' '
     Start-Process -FilePath $bridge -ArgumentList $arguments -WindowStyle Hidden|Out-Null
    }
   } finally {$p.Dispose()}

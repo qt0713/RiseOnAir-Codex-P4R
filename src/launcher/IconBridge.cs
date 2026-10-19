@@ -22,7 +22,7 @@ namespace RiseOnAir {
     try {using(var stop=EventWaitHandle.OpenExisting(StopName))stop.Set();}catch(WaitHandleCannotBeOpenedException){}
     using(var gate=new Mutex(false,LockName)) {bool held=false;try{try{held=gate.WaitOne(5000);}catch(AbandonedMutexException){held=true;}return held?0:1;}finally{if(held)gate.ReleaseMutex();}}
    }
-   if(args.Length!=3)return 2;
+   if(args.Length!=3&&args.Length!=4)return 2;
    int pid;long ticks;if(!int.TryParse(args[0],out pid)||!long.TryParse(args[1],out ticks))return 2;
    bool owns;using(var gate=new Mutex(true,LockName,out owns)) {
     if(!owns)return 0;
@@ -30,7 +30,9 @@ namespace RiseOnAir {
     try {
      using(var app=Process.GetProcessById(pid)) {
       if(app.StartTime.ToUniversalTime().Ticks!=ticks||!string.Equals(app.MainModule.FileName,args[2],StringComparison.OrdinalIgnoreCase)||app.ProcessName!="ChatGPT")return 3;
-      window=app.MainWindowHandle;if(!OwnsWindow(window,pid))return 3;
+      long selected;
+      window=args.Length==4&&long.TryParse(args[3],out selected)?new IntPtr(selected):app.MainWindowHandle;
+      if(!OwnsWindow(window,pid))return 3;
       var icon=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"rise-icon-v1.ico");
       small=LoadImage(IntPtr.Zero,icon,1,32,32,0x10);big=LoadImage(IntPtr.Zero,icon,1,64,64,0x10);
       if(small==IntPtr.Zero||big==IntPtr.Zero)throw new InvalidOperationException("Rise icon could not be loaded.");

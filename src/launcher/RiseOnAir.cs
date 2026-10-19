@@ -21,25 +21,24 @@ namespace RiseOnAir {
   public static bool Preview;
   public static bool Muted;
   public static bool ExistingSession;
+  public static volatile bool ResumeCompleted;
+  public static volatile bool ResumeFailed;
+  static bool resumeAttempted;
+  static IntPtr sessionWindow;
   static string launchToken;
   static readonly object LogLock=new object();
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
   [DllImport("user32.dll")] static extern bool ShowWindowAsync(IntPtr window,int command);
   [DllImport("user32.dll")] static extern bool IsIconic(IntPtr window);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,out uint pid);
   [DllImport("user32.dll")] static extern IntPtr FindWindow(string className,string title);
   public static void Log(string message) {
    try { lock(LogLock) File.AppendAllText(Path.Combine(Home,"launcher.log"),DateTime.UtcNow.ToString("o")+" "+message+Environment.NewLine,Encoding.UTF8); } catch { }
   }
   public static IntPtr CodexWindow() {
-   foreach(var process in Process.GetProcessesByName("ChatGPT")) {
-    try { using(process) {
-     if(process.MainWindowHandle==IntPtr.Zero || !IsWindowVisible(process.MainWindowHandle)) continue;
-     var location=process.MainModule.FileName;
-     if(location.IndexOf("OpenAI.Codex_",StringComparison.OrdinalIgnoreCase)>=0) return process.MainWindowHandle;
-    }} catch { }
-   }
-   return IntPtr.Zero;
+   if(resumeAttempted)return IsWindowVisible(sessionWindow)?sessionWindow:IntPtr.Zero;
+   return CodexSession.Window();
   }
   public static void Activate(IntPtr handle) {
    if(handle==IntPtr.Zero)return;
@@ -55,19 +54,41 @@ namespace RiseOnAir {
    launchToken=Guid.NewGuid().ToString("N");
    var shell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),@"System32\WindowsPowerShell\v1.0\powershell.exe");
    var script=Path.Combine(Home,"scripts","Theme-Control.ps1");
-   return Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+script+"\" -Action "+(login?"Login":"Apply")+" -LaunchToken "+launchToken+(background?" -Background":"")) {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
+   return Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+script+"\" -Action "+(login?"Login":"Apply")+" -LaunchToken "+launchToken+(background?" -Background":"")+(ResumeCompleted?" -NativeWindow "+sessionWindow.ToInt64():"")) {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
   }
   public static void OpenCodex() {
+   if(ExistingSession) {
+    resumeAttempted=true;
+    ResumeCompleted=ResumeVerifiedSession();ResumeFailed=!ResumeCompleted;
+    Log("resume-complete="+ResumeCompleted);
+   }
    var themeScript=Path.Combine(Home,"scripts","Theme-Control.ps1");
    if(File.Exists(themeScript)&&File.Exists(Path.Combine(Home,"integration.json"))) {
     var ready=Path.Combine(Home,"LaunchReady.flag");if(File.Exists(ready))File.Delete(ready);
     using(var process=ThemeProcess(false,ExistingSession)) { }
     Log("theme-activation-requested");return;
    }
+   ActivatePackage();
+  }
+  static void ActivatePackage() {
    var appId=File.ReadAllText(Path.Combine(Home,"CodexAppId.txt")).Trim();
    if(!Regex.IsMatch(appId,@"^[A-Za-z0-9._-]+![A-Za-z0-9._-]+$")) throw new InvalidDataException("Invalid application identifier.");
    Process.Start(new ProcessStartInfo("explorer.exe","shell:AppsFolder\\"+appId) {UseShellExecute=true,WindowStyle=ProcessWindowStyle.Hidden});
    Log("codex-activation-requested "+appId);
+  }
+  static bool ResumeVerifiedSession() {
+   var token=Guid.NewGuid().ToString("N");var flag=Path.Combine(Home,"Resume-"+token+".flag");
+   var shell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),@"System32\WindowsPowerShell\v1.0\powershell.exe");
+   try {
+    using(var process=Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+Path.Combine(Home,"scripts","Resume-Session.ps1")+"\" -LaunchToken "+token){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden})) {
+     if(!process.WaitForExit(30000)||process.ExitCode!=0)return false;
+    }
+    long handle;if(!long.TryParse(File.ReadAllText(flag),out handle))return false;
+    uint pid;var window=new IntPtr(handle);GetWindowThreadProcessId(window,out pid);
+    if(!CodexSession.ProcessIds().Contains((int)pid)||!IsWindowVisible(window))return false;
+    sessionWindow=window;Log("resume-verified-main-window pid="+pid+" handle="+handle);return true;
+   }catch(Exception ex){Log("resume-error "+ex.Message);return false;}
+   finally{try{if(File.Exists(flag))File.Delete(flag);}catch{}}
   }
   [STAThread] public static int Main(string[] args) {
    Preview=args.Contains("--preview") || args.Contains("--self-test");
@@ -82,9 +103,10 @@ namespace RiseOnAir {
    }
    bool owns;
    using(var mutex=new Mutex(true,"Local\\RiseOnAir.Codex.Launcher",out owns)) {
-    if(!owns) { Activate(FindWindow(null,"Codex · Rise On Air"));Log("duplicate-launch-ignored");return 0; }
-    ExistingSession=!Preview && CodexWindow()!=IntPtr.Zero;
+    if(!owns) { var player=FindWindow(null,"Codex · Rise On Air");Activate(player!=IntPtr.Zero?player:CodexWindow());Log("duplicate-launch-activated");return 0; }
+    ExistingSession=!Preview && (CodexWindow()!=IntPtr.Zero || CodexSession.HasMainProcess());
     Log("manual-intro existing="+ExistingSession);
+    var initialWindow=CodexSession.Window(true);Log("session-window="+(initialWindow==IntPtr.Zero?"none":IsWindowVisible(initialWindow)?"visible":"hidden"));
     try {
      var app=new Application {ShutdownMode=ShutdownMode.OnMainWindowClose};
      app.DispatcherUnhandledException+=(sender,eventArgs)=>{Log("unhandled "+eventArgs.Exception.Message);eventArgs.Handled=true;app.Shutdown(1);};

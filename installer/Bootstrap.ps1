@@ -52,10 +52,11 @@ if($Action -eq 'Install'){
  . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
  Set-RiseSurfaceAdapter -StateRoot $stateRoot -InstallRoot $InstallRoot
  $imported=Import-DreamSkinThemeZip -ArchivePath (Join-Path $InstallRoot 'theme.zip') -StateRoot $stateRoot
- $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.4';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
+ $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.5';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'integration.json'),($record|ConvertTo-Json -Depth 6),(New-Object Text.UTF8Encoding($false)))
  $appId=$package.PackageFamilyName+'!App'
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'CodexAppId.txt'),$appId)
+ [IO.File]::WriteAllText((Join-Path $InstallRoot 'CodexExe.txt'),$codexExecutable)
  . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
  Set-RiseEntryPoints -InstallRoot $InstallRoot -Record $record
  Set-RiseWindowRelaunch -InstallRoot $InstallRoot -Record $record

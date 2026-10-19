@@ -15,7 +15,7 @@ Copy-Item -LiteralPath (Join-Path $root 'assets\rise-on-air-icon-v2.ico') -Desti
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE'),(Join-Path $root 'THIRD_PARTY_NOTICES.md') -Destination $stage -Force
 Copy-Item -LiteralPath (Join-Path $root 'src\runtime') -Destination $stage -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root 'licenses') -Destination $stage -Recurse -Force
-foreach($file in @('Common.ps1','Theme-Control.ps1','Bootstrap.ps1','Surface-Patch.ps1','Entry-Points.ps1','ShellIdentity.cs')){
+foreach($file in @('Common.ps1','Theme-Control.ps1','Bootstrap.ps1','Surface-Patch.ps1','Entry-Points.ps1','ShellIdentity.cs','Resume-Session.ps1','ResumeWindow.cs')){
  $text=[IO.File]::ReadAllText((Join-Path $root ('installer\'+$file)))
  [IO.File]::WriteAllText((Join-Path $stage ('scripts\'+$file)),$text,(New-Object Text.UTF8Encoding($true)))
 }
@@ -32,9 +32,9 @@ if(Test-Path -LiteralPath $themeZip){Remove-Item -LiteralPath $themeZip}
 $framework=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 $arguments=@('/nologo','/target:winexe','/platform:x64','/optimize+',('/out:'+(Join-Path $stage 'RiseOnAir.exe')),('/win32manifest:'+(Join-Path $root 'src\launcher\app.manifest')),('/win32icon:'+(Join-Path $stage 'rise-icon-v1.ico')))
 foreach($file in @('PresentationFramework.dll','PresentationCore.dll','WindowsBase.dll')){$arguments+=('/reference:'+(Join-Path $framework ('WPF\'+$file)))}
-foreach($file in @('System.Xaml.dll','System.Windows.Forms.dll','System.Drawing.dll')){$arguments+=('/reference:'+(Join-Path $framework $file))}
+foreach($file in @('System.Xaml.dll','System.Windows.Forms.dll','System.Drawing.dll','System.Management.dll')){$arguments+=('/reference:'+(Join-Path $framework $file))}
 foreach($file in @('Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.Wpf.dll')){$arguments+=('/reference:'+(Join-Path $stage $file))}
-& (Join-Path $framework 'csc.exe') @arguments (Join-Path $root 'src\launcher\RiseOnAir.cs') (Join-Path $root 'src\launcher\WebLaunchWindow.cs') (Join-Path $root 'src\launcher\WindowPlacement.cs')
+& (Join-Path $framework 'csc.exe') @arguments (Join-Path $root 'src\launcher\RiseOnAir.cs') (Join-Path $root 'src\launcher\WebLaunchWindow.cs') (Join-Path $root 'src\launcher\WindowPlacement.cs') (Join-Path $root 'src\launcher\CodexSession.cs')
 if($LASTEXITCODE -ne 0){throw 'Launcher compile failed.'}
 & (Join-Path $framework 'csc.exe') '/nologo' '/target:winexe' '/platform:x64' '/optimize+' ('/out:'+(Join-Path $stage 'RiseIconBridge.exe')) (Join-Path $root 'src\launcher\IconBridge.cs')
 if($LASTEXITCODE -ne 0){throw 'Icon bridge compile failed.'}
@@ -46,7 +46,7 @@ if($StageOnly){Write-Output $stage;exit 0}
 if(-not $Compiler){$Compiler=Join-Path $root '.cache\inno\ISCC.exe'}
 & $Compiler ('/DBuildRoot='+$stage) ('/DOutputRoot='+$output) (Join-Path $root 'installer\RiseOnAir.iss')
 if($LASTEXITCODE -ne 0){throw 'Installer compilation failed.'}
-$installer=Join-Path $output 'RiseOnAir-Setup-v1.0.4-windows-x64.exe'
+$installer=Join-Path $output 'RiseOnAir-Setup-v1.0.5-windows-x64.exe'
 $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 ($hash+'  '+[IO.Path]::GetFileName($installer))|Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
 Write-Output $installer
