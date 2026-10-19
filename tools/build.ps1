@@ -36,6 +36,8 @@ foreach($file in @('System.Xaml.dll','System.Windows.Forms.dll','System.Drawing.
 foreach($file in @('Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.Wpf.dll')){$arguments+=('/reference:'+(Join-Path $stage $file))}
 & (Join-Path $framework 'csc.exe') @arguments (Join-Path $root 'src\launcher\RiseOnAir.cs') (Join-Path $root 'src\launcher\WebLaunchWindow.cs') (Join-Path $root 'src\launcher\WindowPlacement.cs')
 if($LASTEXITCODE -ne 0){throw 'Launcher compile failed.'}
+& (Join-Path $framework 'csc.exe') '/nologo' '/target:winexe' '/platform:x64' '/optimize+' ('/out:'+(Join-Path $stage 'RiseIconBridge.exe')) (Join-Path $root 'src\launcher\IconBridge.cs')
+if($LASTEXITCODE -ne 0){throw 'Icon bridge compile failed.'}
 Copy-Item -LiteralPath (Join-Path $root 'src\launcher\RiseOnAir.exe.config') -Destination $stage -Force
 'OpenAI.Codex_2p2nqsd0c76g0!App'|Set-Content -LiteralPath (Join-Path $stage 'CodexAppId.txt') -Encoding ascii
 $notes="Rise On Air · 理世主题`r`n`r`n安装会关闭 Codex，请先保存未发送的输入。`r`n包含本地主题、3.2 秒有声启动动画、理世快捷方式和恢复入口。`r`n这是个人同人项目，不是 ATLUS、SEGA 或 OpenAI 官方产品。`r`n官方客户端更新后，第三方主题可能需要更新；若加载失败将恢复普通外观。`r`n安装不会改动 WindowsApps、应用签名或 API 提供商配置。"

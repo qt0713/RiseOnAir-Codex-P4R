@@ -8,6 +8,8 @@ function Set-RiseWindowRelaunch {
  $pkg=Get-AppxPackage -Name OpenAI.Codex|Select-Object -First 1
  if(-not $pkg -or $pkg.SignatureKind -ne 'Store'){throw 'Registered official Codex is required.'}
  $expected=Join-Path $pkg.InstallLocation 'app\ChatGPT.exe'
+ $bridge=Join-Path $InstallRoot 'RiseIconBridge.exe'
+ if($Remove -and (Test-Path -LiteralPath $bridge)){Invoke-RiseProcess -File $bridge -Arguments @('--stop')}
  foreach($p in Get-Process -Name ChatGPT -ErrorAction SilentlyContinue){
   try {
    if($p.MainWindowHandle -eq [IntPtr]::Zero -or $p.Path -ine $expected){continue}
@@ -15,10 +17,14 @@ function Set-RiseWindowRelaunch {
    # Keep the native app separate from the launcher pin: otherwise Shell
    # activates its running window and never executes the animation launcher.
    # Relaunch display name and command must be set together (Microsoft contract).
-   $values=@{2=('"'+(Join-Path $InstallRoot 'RiseOnAir.exe')+'"');3=((Join-Path $InstallRoot 'rise-icon-v1.ico')+',0');4='Codex - Rise On Air';5=($Record.codexPackageFamily+'!App')}
+   $values=@{2=('"'+(Join-Path $InstallRoot 'RiseOnAir.exe')+'"');3=((Join-Path $InstallRoot 'rise-icon-v1.ico')+',0');4='Codex - Rise On Air';5='qt0713.RiseOnAir.Codex.Client'}
    foreach($id in @(2,3,4,5)){
     $value=if($Remove){$null}else{$values[$id]}
     [RiseOnAir.ShellIdentity]::Write($null,$hwnd,$id,$value)
+   }
+   if(-not $Remove -and (Test-Path -LiteralPath $bridge)){
+    $arguments=@([string]$p.Id,[string]$p.StartTime.ToUniversalTime().Ticks,('"'+$expected+'"')) -join ' '
+    Start-Process -FilePath $bridge -ArgumentList $arguments -WindowStyle Hidden|Out-Null
    }
   } finally {$p.Dispose()}
  }

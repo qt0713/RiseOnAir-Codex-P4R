@@ -14,7 +14,12 @@ function Assert-RiseShortcut {
   if([IO.Path]::GetFileName($target) -ne 'RiseOnAir.exe'){throw '桌面存在同名但不属于本项目的快捷方式，请先重命名该快捷方式。'}
  }
 }
-if($Action -eq 'Preflight'){Assert-RiseShortcut;exit 0}
+if($Action -eq 'Preflight'){
+ Assert-RiseShortcut
+ $bridge=Join-Path $InstallRoot 'RiseIconBridge.exe'
+ if(Test-Path -LiteralPath $bridge){Invoke-RiseProcess -File $bridge -Arguments @('--stop')}
+ exit 0
+}
 if($Action -eq 'Uninstall' -and -not(Test-Path -LiteralPath (Join-Path $InstallRoot 'integration.json'))){exit 0}
 $logDirectory=Join-Path $InstallRoot 'logs'
 New-Item -ItemType Directory -Path $logDirectory -Force|Out-Null
