@@ -77,7 +77,10 @@ namespace RiseOnAir {
     using(var process=ThemeProcess(false,false)) {
      Log("theme-activation-requested");
       if(!process.WaitForExit(150000)||process.ExitCode!=0){ResumeFailed=true;Log("theme-start-failed");return;}
-      ResumeCompleted=ResumeVerifiedSession();ResumeFailed=!ResumeCompleted;
+      var windowFlag=Path.Combine(Home,"LaunchWindow-"+launchToken+".flag");
+      try {ResumeCompleted=AcceptWindowFlag(windowFlag);}catch{ResumeCompleted=false;}
+      finally{try{File.Delete(windowFlag);}catch{}}
+      if(!ResumeCompleted)ResumeCompleted=ResumeVerifiedSession();ResumeFailed=!ResumeCompleted;
       Log("new-session-resume="+ResumeCompleted);
     }
     return;
@@ -97,12 +100,15 @@ namespace RiseOnAir {
     using(var process=Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+Path.Combine(Home,"scripts","Resume-Session.ps1")+"\" -LaunchToken "+token+" -IntroEventName "+IntroEventName){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden})) {
      if(!process.WaitForExit(30000)||process.ExitCode!=0)return false;
     }
+    return AcceptWindowFlag(flag);
+   }catch(Exception ex){Log("resume-error "+ex.Message);return false;}
+   finally{try{if(File.Exists(flag))File.Delete(flag);}catch{}}
+  }
+  static bool AcceptWindowFlag(string flag) {
     long handle;if(!long.TryParse(File.ReadAllText(flag),out handle))return false;
     uint pid;var window=new IntPtr(handle);GetWindowThreadProcessId(window,out pid);
     if(!CodexSession.ProcessIds().Contains((int)pid)||!IsWindowVisible(window))return false;
     sessionWindow=window;Log("resume-verified-main-window pid="+pid+" handle="+handle);return true;
-   }catch(Exception ex){Log("resume-error "+ex.Message);return false;}
-   finally{try{if(File.Exists(flag))File.Delete(flag);}catch{}}
   }
   [STAThread] public static int Main(string[] args) {
    AppDomain.CurrentDomain.ProcessExit+=(sender,eventArgs)=>Log("exit");

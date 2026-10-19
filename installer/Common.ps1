@@ -1,7 +1,7 @@
 $ErrorActionPreference='Stop'
 $env:PSModulePath=(Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\Modules')+';'+$env:PSModulePath
 function Invoke-RiseProcess {
- param([string]$File,[string[]]$Arguments,[string]$LogPrefix)
+ param([string]$File,[string[]]$Arguments,[string]$LogPrefix,[scriptblock]$OnPoll)
  $quoted=($Arguments|ForEach-Object{'"'+$_.Replace('"','\"')+'"'}) -join ' '
  $parameters=@{FilePath=$File;ArgumentList=$quoted;WindowStyle='Hidden';PassThru=$true}
  if($LogPrefix){$parameters.RedirectStandardOutput=$LogPrefix+'.out.log';$parameters.RedirectStandardError=$LogPrefix+'.err.log'}
@@ -11,7 +11,7 @@ function Invoke-RiseProcess {
   # lose ExitCode when a fast child has already exited. File redirection also
   # avoids waiting for EOF from a persistent injector's inherited pipes.
   $nativeHandle=$process.Handle
-  $process.WaitForExit()
+  if($OnPoll){while(-not $process.WaitForExit(200)){& $OnPoll}}else{$process.WaitForExit()}
   $process.Refresh()
   $exitCode=$process.ExitCode
   if($null -eq $exitCode){throw 'Child process exit status is unavailable.'}

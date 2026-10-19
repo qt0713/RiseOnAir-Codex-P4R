@@ -29,7 +29,17 @@ try {
   if($EnsureSession){Write-LaunchPhase 'ensure-session';. (Join-Path $PSScriptRoot 'Session-Ensure.ps1');$sessionPort=Ensure-RiseThemeSession -Record $record -IntroEventName $IntroEventName;Write-LaunchPhase 'session-restored'}
   . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
   Set-RiseSurfaceAdapter -StateRoot $record.stateRoot -InstallRoot $installRoot
-  $startArguments=@('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $engineScripts 'start-dream-skin.ps1'),'-SavedThemeDirectory',$record.themeDirectory,'-RequireUnpaused')
+  $reuseTheme=$false
+  try{
+   . (Join-Path $engineScripts 'common-windows.ps1')
+   . (Join-Path $engineScripts 'theme-windows.ps1')
+   $activeFingerprint=Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory (Join-Path $record.stateRoot 'active-theme')
+   $savedFingerprint=Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $record.themeDirectory
+   $reuseTheme=$activeFingerprint -and $activeFingerprint -ceq $savedFingerprint
+  }catch{$reuseTheme=$false}
+  $startArguments=@('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $engineScripts 'start-dream-skin.ps1'),'-RequireUnpaused')
+  if(-not $reuseTheme){$startArguments+=@('-SavedThemeDirectory',$record.themeDirectory)}
+  Write-LaunchPhase ('reuse-theme-content='+$reuseTheme)
   # Login is silent and never authorizes closing an existing user session.
   if($sessionPort){$startArguments+=@('-Port',[string]$sessionPort)}
   if($Action -ne 'Login' -and -not $Background -and -not $EnsureSession){$startArguments+='-PromptRestart'}
@@ -45,7 +55,25 @@ try {
   }
   if(-not $alreadyVerified){
   Write-LaunchPhase 'apply-theme'
-  Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments $startArguments -LogPrefix (Join-Path $logDirectory 'start')
+  $onStarted=$null
+  if($sessionPort){
+   $prior=Read-DreamSkinState -Path (Join-Path $record.stateRoot 'state.json')
+   $handoff=@{done=$false;generation="$($prior.createdAt)"}
+   $onStarted={try{
+    if(-not $handoff.done){
+     $now=Read-DreamSkinState -Path (Join-Path $record.stateRoot 'state.json')
+     if($now -and "$($now.createdAt)" -ne $handoff.generation){
+      $handoff.done=$true
+      $live=Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $sessionPort
+      if(!$live -or $live.Identity.BrowserId -cne $now.browserId){throw 'Theme session changed before final window handoff.'}
+      . (Join-Path $PSScriptRoot 'Window-Resume.ps1')
+      $handoff.window=Restore-RiseThemeWindow -Record $record -Codex $live.Codex -Identity $live.Identity -Port $sessionPort -InstallRoot $installRoot -IntroEventName $IntroEventName -ShowForHandoff
+      Write-LaunchPhase 'injector-ready-window-restored'
+     }
+    }
+   }catch{$handoff.done=$true;Write-LaunchPhase ('window-handoff-failed '+$_.Exception.Message)}}
+  }
+  Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments $startArguments -LogPrefix (Join-Path $logDirectory 'start') -OnPoll $onStarted
   Write-LaunchPhase 'verify-theme'
   # Windows upstream returns zero when its native restart prompt is cancelled.
   # Verify the current Browser ID and renderer instead of trusting that exit.
@@ -54,9 +82,13 @@ try {
   $active=Get-Content -LiteralPath (Join-Path $record.stateRoot 'active-theme\theme.json') -Raw -Encoding UTF8|ConvertFrom-Json
   if($active.id -ne 'p4r-rise-on-air'){throw 'The verified active theme is not Rise On Air.'}
   . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
+  if($sessionPort -and $handoff.window){$NativeWindow=[long]$handoff.window}
   try{Set-RiseWindowRelaunch -InstallRoot $installRoot -Record $record -NativeWindow $NativeWindow}catch{$_|Out-File (Join-Path $logDirectory 'window-decoration-error.txt') -Encoding UTF8}
   if(Test-Path -LiteralPath (Join-Path $logDirectory 'last-error.txt')){Remove-Item -LiteralPath (Join-Path $logDirectory 'last-error.txt')}
-  if($LaunchToken){[IO.File]::WriteAllText($readyFile,$LaunchToken)}
+  if($LaunchToken){
+   if($sessionPort -and $handoff.window){[IO.File]::WriteAllText((Join-Path $installRoot ('LaunchWindow-'+$LaunchToken+'.flag')),[string]$handoff.window)}
+   [IO.File]::WriteAllText($readyFile,$LaunchToken)
+  }
   Write-LaunchPhase 'ready'
  }
 } catch {

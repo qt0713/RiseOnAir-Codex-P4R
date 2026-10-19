@@ -36,6 +36,15 @@ Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' 'exit 0'
 Write-TestFile 'state\active-theme\theme.json' '{"id":"different-theme"}'
 & $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
 if($LASTEXITCODE -eq 0 -or (Test-Path (Join-Path $test 'LaunchReady.flag'))){throw 'Wrong theme must not report ready.'}
+Write-TestFile 'state\active-theme\theme.json' '{"id":"p4r-rise-on-air"}'
+Write-TestFile 'state\engine\scripts\theme-windows.ps1' 'function Get-DreamSkinThemeRuntimeContentFingerprint {param($ThemeDirectory) return "same-content"}'
+Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' 'param([string]$SavedThemeDirectory,[switch]$RequireUnpaused) if($SavedThemeDirectory){exit 78};exit 0'
+& $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
+if($LASTEXITCODE -ne 0){throw 'Identical theme content must skip reimport.'}
+Write-TestFile 'state\engine\scripts\theme-windows.ps1' 'function Get-DreamSkinThemeRuntimeContentFingerprint {param($ThemeDirectory) return $ThemeDirectory}'
+Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' 'param([string]$SavedThemeDirectory,[switch]$RequireUnpaused) if($SavedThemeDirectory -ne "fixture"){exit 79};exit 0'
+& $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
+if($LASTEXITCODE -ne 0){throw 'Changed theme content must still select the saved theme.'}
 Add-Type -Path (Join-Path $root 'installer\ShellIdentity.cs')
 $shortcut=Join-Path $test 'Property store test.lnk'
 $link=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)

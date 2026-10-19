@@ -1,5 +1,5 @@
 function Restore-RiseThemeWindow {
- param([object]$Record,[object]$Codex,[object]$Identity,[int]$Port,[string]$InstallRoot,[string]$IntroEventName)
+ param([object]$Record,[object]$Codex,[object]$Identity,[int]$Port,[string]$InstallRoot,[string]$IntroEventName,[switch]$ShowForHandoff)
  $owners=@((Get-DreamSkinPortListeners -Port $Port).OwningProcess|Sort-Object -Unique)
  if($owners.Count -ne 1){throw 'Ambiguous theme browser owner.'}
  $node=Get-DreamSkinNodeRuntime
@@ -18,7 +18,7 @@ function Restore-RiseThemeWindow {
    Start-Sleep -Milliseconds 200
   }
  }while($true)
- if($bounds.visibility -eq 'hidden'){
+ if($bounds.visibility -eq 'hidden' -or $ShowForHandoff){
   if($Codex.Version -ne '26.1013.4894.0'){throw 'This client version has not been verified for native main-window resume.'}
   if($IntroEventName){
    $event=$null
