@@ -7,6 +7,8 @@ $env:LOCALAPPDATA=Split-Path -Parent $record.stateRoot
 $engineScripts=Join-Path $record.stateRoot 'engine\scripts'
 $logDirectory=Join-Path $installRoot 'logs'
 New-Item -ItemType Directory -Path $logDirectory -Force|Out-Null
+function Write-LaunchPhase([string]$Phase){[IO.File]::AppendAllText((Join-Path $logDirectory 'startup-phases.log'),([DateTime]::UtcNow.ToString('o')+' token='+$LaunchToken+' '+$Phase+[Environment]::NewLine))}
+Write-LaunchPhase 'begin'
 $readyFile=Join-Path $installRoot 'LaunchReady.flag'
 $controlLock=$null
 try {
@@ -24,7 +26,7 @@ try {
   & (Join-Path $engineScripts 'tray-dream-skin.ps1') -ShowWindow
  } else {
   $sessionPort=$null
-  if($EnsureSession){. (Join-Path $PSScriptRoot 'Session-Ensure.ps1');$sessionPort=Ensure-RiseThemeSession -Record $record -IntroEventName $IntroEventName}
+  if($EnsureSession){Write-LaunchPhase 'ensure-session';. (Join-Path $PSScriptRoot 'Session-Ensure.ps1');$sessionPort=Ensure-RiseThemeSession -Record $record -IntroEventName $IntroEventName;Write-LaunchPhase 'session-restored'}
   . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
   Set-RiseSurfaceAdapter -StateRoot $record.stateRoot -InstallRoot $installRoot
   $startArguments=@('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $engineScripts 'start-dream-skin.ps1'),'-SavedThemeDirectory',$record.themeDirectory,'-RequireUnpaused')
@@ -42,7 +44,9 @@ try {
    }catch{$alreadyVerified=$false}
   }
   if(-not $alreadyVerified){
+  Write-LaunchPhase 'apply-theme'
   Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments $startArguments -LogPrefix (Join-Path $logDirectory 'start')
+  Write-LaunchPhase 'verify-theme'
   # Windows upstream returns zero when its native restart prompt is cancelled.
   # Verify the current Browser ID and renderer instead of trusting that exit.
   Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments @('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $engineScripts 'verify-dream-skin.ps1')) -LogPrefix (Join-Path $logDirectory 'launch-verify')
@@ -53,8 +57,10 @@ try {
   try{Set-RiseWindowRelaunch -InstallRoot $installRoot -Record $record -NativeWindow $NativeWindow}catch{$_|Out-File (Join-Path $logDirectory 'window-decoration-error.txt') -Encoding UTF8}
   if(Test-Path -LiteralPath (Join-Path $logDirectory 'last-error.txt')){Remove-Item -LiteralPath (Join-Path $logDirectory 'last-error.txt')}
   if($LaunchToken){[IO.File]::WriteAllText($readyFile,$LaunchToken)}
+  Write-LaunchPhase 'ready'
  }
 } catch {
+ Write-LaunchPhase ('failed '+$_.Exception.Message)
  $_.Exception.Message|Set-Content -LiteralPath (Join-Path $logDirectory 'last-error.txt') -Encoding UTF8
  if($Action -in @('Apply','Login')){
   # Upstream startup owns transactional recovery. Preserve any existing

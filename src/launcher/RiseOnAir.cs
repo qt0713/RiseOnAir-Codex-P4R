@@ -23,6 +23,7 @@ namespace RiseOnAir {
   public static bool ExistingSession;
   public static volatile bool ResumeCompleted;
   public static volatile bool ResumeFailed;
+  static volatile bool themeVerified;
   public static readonly ManualResetEvent StartupFinished=new ManualResetEvent(true);
   public static readonly string IntroEventName="Local\\RiseOnAir.IntroFinished."+Guid.NewGuid().ToString("N");
   public static readonly EventWaitHandle IntroFinished=new EventWaitHandle(false,EventResetMode.ManualReset,IntroEventName);
@@ -52,6 +53,7 @@ namespace RiseOnAir {
   }
   public static bool IsReady() {
    if(CodexWindow()==IntPtr.Zero)return false;
+   if(themeVerified)return true;
    if(!File.Exists(Path.Combine(Home,"integration.json")))return true;
    try {return launchToken!=null && File.ReadAllText(Path.Combine(Home,"LaunchReady.flag")).Trim()==launchToken;}catch{return false;}
   }
@@ -64,9 +66,11 @@ namespace RiseOnAir {
   public static void OpenCodex() {
    resumeAttempted=true;
    ResumeFailed=false;
+   themeVerified=false;
    ResumeCompleted=ResumeVerifiedSession();
    ExistingSession=ResumeCompleted;
    Log("resume-complete="+ResumeCompleted);
+   if(ResumeCompleted){themeVerified=true;Log("ready verified-existing-theme");return;}
    var themeScript=Path.Combine(Home,"scripts","Theme-Control.ps1");
    if(File.Exists(themeScript)&&File.Exists(Path.Combine(Home,"integration.json"))) {
     var ready=Path.Combine(Home,"LaunchReady.flag");if(File.Exists(ready))File.Delete(ready);
