@@ -10,13 +10,13 @@
 
 ## macOS 版（Beta）
 
-新增原生 AppKit / WKWebView 启动器、Universal 二进制、理世 ICNS 图标和 DMG/ZIP。[下载 macOS Beta](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.1)，安装与测试范围见 **[macOS 中文说明](docs/MACOS.md)**。macOS 版与 Windows 安装包分开发布；Beta 不代表真实登录用户的主题接入已经全场景验收。
+原生 AppKit / WKWebView 启动器、Universal 二进制、理世 ICNS 图标和 DMG/ZIP。[下载 macOS Beta](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.2)，安装与测试范围见 **[macOS 中文说明](docs/MACOS.md)**。macOS 版与 Windows 安装包分开发布；Beta 不代表真实登录用户的主题接入已经全场景验收。
 
 ## Windows 一键安装
 
 前往 **[Releases 下载 Windows 安装包](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/latest)**：
 
-1. 下载 `RiseOnAir-Setup-v1.0.2-windows-x64.exe`；可用同页 `SHA256SUMS.txt` 核对摘要。
+1. 下载 `RiseOnAir-Setup-v1.0.3-windows-x64.exe`；可用同页 `SHA256SUMS.txt` 核对摘要。
 2. 保存 Codex 中尚未发送的输入，然后运行安装包。首次配置或需要更新引擎时可能关闭客户端；按当前用户安装，无需接管 WindowsApps。
 3. 保持安装完成页的“启动 Codex 并应用理世主题”选项，或双击桌面 **Codex - 理世启动**。
 
@@ -28,12 +28,22 @@
 
 | 入口 | 行为 |
 | --- | --- |
-| 桌面 / 开始菜单：Codex - 理世启动 | 同时加载主题与播放 3.2 秒展示动画；客户端已有可见窗口时直接唤起。 |
+| 桌面 / 开始菜单：Codex - 理世启动 | 冷启动加载主题并播放 3.2 秒展示动画；已有窗口时仍先验证主题，再唤起。 |
 | 开始菜单：预览启动动画 | 单独查看动画，不启动或关闭 Codex。 |
 | 开始菜单：理世主题管理 | 打开上游主题管理界面，可管理已保存主题与背景。 |
 | 开始菜单：恢复 Codex 原始外观 | 使用上游恢复流程恢复外观并关闭调试会话。 |
 
 快捷方式直接引用安装目录中的 `rise-icon-v1.ico`，同时可执行文件内嵌同一图标。ICO 包含 **16 / 24 / 32 / 48 / 64 / 128 / 256 px**，保留透明圆角。安装结束会通知 Windows Shell 刷新，避免依赖工作区或临时目录中的图片。
+
+## v1.0.3：任务栏入口与登录恢复
+
+修复已有窗口直接跳过主题验证、隐藏 PowerShell 经 Shell 启动可能出现终端、取消重启仍误报就绪的问题。就绪标记绑定每次启动的随机令牌，并在真实主题验证后写入。
+
+安装会为本项目写入 **HKCU Run / RiseOnAir** 登录项，命令为安装目录 `RiseOnAir.exe --login`。下一次登录时打开 Codex 并恢复主题，不播放动画、不请求重启、不强关已有会话。若普通 Codex 抢先启动而没有 CDP，后台只记录失败；保存工作后退出 Codex，再打开理世入口。恢复外观或卸载时移除此登录项。
+
+任务栏使用独立标识 `qt0713.RiseOnAir.Codex`，匹配的传统固定快捷方式会备份后改为理世启动器；已验证的官方窗口也设置对应的重新打开命令和图标。**Windows 的商店固定项可能仍缓存官方入口**，系统合并规则不允许可靠地用快捷方式替换它。升级后若点击旧图标仍走普通入口，请取消固定旧 Codex 图标，再将开始菜单 **Codex - 理世启动** 固定到任务栏一次。不会编辑任务栏二进制注册表或修改官方程序来强制替换固定项。
+
+登录恢复成功后，官方图标会唤起已有主题会话；关闭所有客户端后再冷启动普通官方图标，仍不能保证带有主题所需参数。减少额外等待的日常入口是理世任务栏图标；已有窗口不会重复播放动画。
 
 ## 动画与主题
 

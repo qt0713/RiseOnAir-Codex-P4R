@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([ValidateSet('Preflight','Install','Uninstall','Verify')][string]$Action,[string]$InstallRoot,[switch]$NoLaunch)
 . (Join-Path $PSScriptRoot 'Common.ps1')
 if(-not $InstallRoot){$InstallRoot=Split-Path -Parent $PSScriptRoot}
@@ -47,15 +47,19 @@ if($Action -eq 'Install'){
  . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
  Set-RiseSurfaceAdapter -StateRoot $stateRoot -InstallRoot $InstallRoot
  $imported=Import-DreamSkinThemeZip -ArchivePath (Join-Path $InstallRoot 'theme.zip') -StateRoot $stateRoot
- $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.2';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
+ $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.3';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'integration.json'),($record|ConvertTo-Json -Depth 6),(New-Object Text.UTF8Encoding($false)))
  $appId=$package.PackageFamilyName+'!App'
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'CodexAppId.txt'),$appId)
+ . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
+ Set-RiseEntryPoints -InstallRoot $InstallRoot -Record $record
  Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class RiseShellRefresh { [DllImport("shell32.dll",CharSet=CharSet.Unicode)] public static extern void SHChangeNotify(uint e,uint f,string p,IntPtr q); }'
  [RiseShellRefresh]::SHChangeNotify(0x08000000,0,$null,[IntPtr]::Zero)
 } elseif($Action -eq 'Uninstall'){
  $record=Read-RiseIntegration -InstallRoot $InstallRoot
  $env:LOCALAPPDATA=Split-Path -Parent $record.stateRoot
+ . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
+ Set-RiseEntryPoints -InstallRoot $InstallRoot -Record $record -Remove
  Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments @('-NoProfile','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $record.stateRoot 'engine\scripts\restore-dream-skin.ps1'),'-RestoreBaseTheme','-ForceRestart') -LogPrefix (Join-Path $logDirectory 'uninstall-restore')
  . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
  Set-RiseSurfaceAdapter -StateRoot $record.stateRoot -InstallRoot $InstallRoot -Remove
