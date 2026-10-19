@@ -4,6 +4,8 @@ function Import-RiseShellIdentity {
 }
 function Set-RiseWindowRelaunch {
  param([string]$InstallRoot,[object]$Record,[switch]$Remove,[long]$NativeWindow=0)
+ # Installers and generic process enumeration cannot identify the theme surface.
+ if(-not $Remove -and -not $NativeWindow){return}
  Import-RiseShellIdentity
  $pkg=Get-AppxPackage -Name OpenAI.Codex|Select-Object -First 1
  if(-not $pkg -or $pkg.SignatureKind -ne 'Store'){throw 'Registered official Codex is required.'}
@@ -15,16 +17,37 @@ function Set-RiseWindowRelaunch {
   try {
    $hwnd=if($NativeWindow){$NativeWindow}else{$p.MainWindowHandle.ToInt64()}
    if(-not $hwnd -or $p.Path -ine $expected -or [RiseOnAir.ShellIdentity]::WindowProcess($hwnd) -ne $p.Id){continue}
+   if(-not $Remove){
+    # Older installers grouped every visible official process as a Rise client.
+    # Clear only our exact overrides on other instances, keeping them running.
+    foreach($other in Get-Process -Name ChatGPT -ErrorAction SilentlyContinue){
+     try{
+      if($other.Id -eq $p.Id -or $other.Path -ine $expected -or $other.MainWindowHandle -eq [IntPtr]::Zero){continue}
+      $otherWindow=$other.MainWindowHandle.ToInt64()
+      if([RiseOnAir.ShellIdentity]::Read($null,$otherWindow,5) -ceq 'qt0713.RiseOnAir.Codex.Client' -and [RiseOnAir.ShellIdentity]::Read($null,$otherWindow,2) -ceq ('"'+(Join-Path $InstallRoot 'RiseOnAir.exe')+'"')){
+       $defaults=@{2=('"'+$expected+'"');3=($expected+',0');4='Codex';5=($Record.codexPackageFamily+'!App')}
+       foreach($id in @(2,3,4,5)){[RiseOnAir.ShellIdentity]::Write($null,$otherWindow,$id,$defaults[$id])}
+      }
+     }catch{Write-Warning ('Legacy window grouping could not be restored: '+$_.Exception.Message)}finally{$other.Dispose()}
+    }
+   }
    # Keep the native app separate from the launcher pin: otherwise Shell
    # activates its running window and never executes the animation launcher.
    # Relaunch display name and command must be set together (Microsoft contract).
    $values=@{2=('"'+(Join-Path $InstallRoot 'RiseOnAir.exe')+'"');3=((Join-Path $InstallRoot 'rise-icon-v1.ico')+',0');4='Codex - Rise On Air';5='qt0713.RiseOnAir.Codex.Client'}
    foreach($id in @(2,3,4,5)){
     $value=if($Remove){$null}else{$values[$id]}
-    [RiseOnAir.ShellIdentity]::Write($null,$hwnd,$id,$value)
+    if([RiseOnAir.ShellIdentity]::Read($null,$hwnd,$id) -cne $value){[RiseOnAir.ShellIdentity]::Write($null,$hwnd,$id,$value)}
    }
    if(-not $Remove -and (Test-Path -LiteralPath $bridge)){
-    if($NativeWindow){Invoke-RiseProcess -File $bridge -Arguments @('--stop')}
+    $bound=$false
+    try{
+     $state=Get-Content -LiteralPath (Join-Path $InstallRoot 'icon-bridge.json') -Raw -Encoding UTF8|ConvertFrom-Json
+     $keeper=Get-Process -Id $state.bridgePid -ErrorAction Stop
+     $bound=$state.window -eq $hwnd -and $state.appPid -eq $p.Id -and $state.appTicks -eq $p.StartTime.ToUniversalTime().Ticks -and $keeper.Path -ieq $bridge -and $keeper.StartTime.ToUniversalTime().Ticks -eq $state.bridgeTicks
+    }catch{}finally{if($keeper){$keeper.Dispose();$keeper=$null}}
+    if($bound){continue}
+    Invoke-RiseProcess -File $bridge -Arguments @('--stop')
     $arguments=@([string]$p.Id,[string]$p.StartTime.ToUniversalTime().Ticks,('"'+$expected+'"'),[string]$hwnd) -join ' '
     Start-Process -FilePath $bridge -ArgumentList $arguments -WindowStyle Hidden|Out-Null
    }

@@ -23,6 +23,16 @@ if($LASTEXITCODE -eq 0 -or (Test-Path (Join-Path $test 'LaunchReady.flag'))){thr
 Write-TestFile 'state\engine\scripts\verify-dream-skin.ps1' 'exit 0'
 & $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
 if($LASTEXITCODE -ne 0 -or [IO.File]::ReadAllText((Join-Path $test 'LaunchReady.flag')) -cne $token){throw 'Verified readiness must match this launch token.'}
+# A healthy resumed renderer is verified without reinstalling its theme.
+Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' 'exit 77'
+Write-TestFile 'scripts\Entry-Points.ps1' 'function Set-RiseWindowRelaunch {throw "Cosmetic shell property failure"}'
+& $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token -NativeWindow 1
+if($LASTEXITCODE -ne 0){throw 'Healthy resume must skip reapply and tolerate cosmetic icon errors.'}
+Write-TestFile 'state\engine\scripts\verify-dream-skin.ps1' 'exit 1'
+& $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token -NativeWindow 1
+if($LASTEXITCODE -eq 0 -or (Test-Path (Join-Path $test 'LaunchReady.flag'))){throw 'An unverified resumed window must not report success.'}
+Write-TestFile 'state\engine\scripts\verify-dream-skin.ps1' 'exit 0'
+Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' 'exit 0'
 Write-TestFile 'state\active-theme\theme.json' '{"id":"different-theme"}'
 & $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
 if($LASTEXITCODE -eq 0 -or (Test-Path (Join-Path $test 'LaunchReady.flag'))){throw 'Wrong theme must not report ready.'}

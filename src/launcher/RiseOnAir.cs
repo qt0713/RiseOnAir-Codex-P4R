@@ -23,11 +23,15 @@ namespace RiseOnAir {
   public static bool ExistingSession;
   public static volatile bool ResumeCompleted;
   public static volatile bool ResumeFailed;
+  public static readonly ManualResetEvent StartupFinished=new ManualResetEvent(true);
+  public static readonly string IntroEventName="Local\\RiseOnAir.IntroFinished."+Guid.NewGuid().ToString("N");
+  public static readonly EventWaitHandle IntroFinished=new EventWaitHandle(false,EventResetMode.ManualReset,IntroEventName);
   static bool resumeAttempted;
   static IntPtr sessionWindow;
   static string launchToken;
   static readonly object LogLock=new object();
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern bool ShowWindowAsync(IntPtr window,int command);
   [DllImport("user32.dll")] static extern bool IsIconic(IntPtr window);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
@@ -42,8 +46,9 @@ namespace RiseOnAir {
   }
   public static void Activate(IntPtr handle) {
    if(handle==IntPtr.Zero)return;
-   ShowWindowAsync(handle,IsIconic(handle)?9:5);
-   SetForegroundWindow(handle);
+   if(IsIconic(handle))ShowWindowAsync(handle,9);
+   else if(!IsWindowVisible(handle))ShowWindowAsync(handle,5);
+   if(GetForegroundWindow()!=handle)SetForegroundWindow(handle);
   }
   public static bool IsReady() {
    if(CodexWindow()==IntPtr.Zero)return false;
@@ -54,19 +59,24 @@ namespace RiseOnAir {
    launchToken=Guid.NewGuid().ToString("N");
    var shell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),@"System32\WindowsPowerShell\v1.0\powershell.exe");
    var script=Path.Combine(Home,"scripts","Theme-Control.ps1");
-   return Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+script+"\" -Action "+(login?"Login":"Apply")+" -LaunchToken "+launchToken+(background?" -Background":"")+(ResumeCompleted?" -NativeWindow "+sessionWindow.ToInt64():"")) {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
+   return Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+script+"\" -Action "+(login?"Login":"Apply")+" -LaunchToken "+launchToken+(background?" -Background":"")+(ResumeCompleted?" -NativeWindow "+sessionWindow.ToInt64():" -EnsureSession")+(login?"":" -IntroEventName "+IntroEventName)) {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
   }
   public static void OpenCodex() {
-   if(ExistingSession) {
-    resumeAttempted=true;
-    ResumeCompleted=ResumeVerifiedSession();ResumeFailed=!ResumeCompleted;
-    Log("resume-complete="+ResumeCompleted);
-   }
+   resumeAttempted=true;
+   ResumeFailed=false;
+   ResumeCompleted=ResumeVerifiedSession();
+   ExistingSession=ResumeCompleted;
+   Log("resume-complete="+ResumeCompleted);
    var themeScript=Path.Combine(Home,"scripts","Theme-Control.ps1");
    if(File.Exists(themeScript)&&File.Exists(Path.Combine(Home,"integration.json"))) {
     var ready=Path.Combine(Home,"LaunchReady.flag");if(File.Exists(ready))File.Delete(ready);
-    using(var process=ThemeProcess(false,ExistingSession)) { }
-    Log("theme-activation-requested");return;
+    using(var process=ThemeProcess(false,false)) {
+     Log("theme-activation-requested");
+      if(!process.WaitForExit(150000)||process.ExitCode!=0){ResumeFailed=true;Log("theme-start-failed");return;}
+      ResumeCompleted=ResumeVerifiedSession();ResumeFailed=!ResumeCompleted;
+      Log("new-session-resume="+ResumeCompleted);
+    }
+    return;
    }
    ActivatePackage();
   }
@@ -80,7 +90,7 @@ namespace RiseOnAir {
    var token=Guid.NewGuid().ToString("N");var flag=Path.Combine(Home,"Resume-"+token+".flag");
    var shell=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),@"System32\WindowsPowerShell\v1.0\powershell.exe");
    try {
-    using(var process=Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+Path.Combine(Home,"scripts","Resume-Session.ps1")+"\" -LaunchToken "+token){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden})) {
+    using(var process=Process.Start(new ProcessStartInfo(shell,"-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File \""+Path.Combine(Home,"scripts","Resume-Session.ps1")+"\" -LaunchToken "+token+" -IntroEventName "+IntroEventName){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden})) {
      if(!process.WaitForExit(30000)||process.ExitCode!=0)return false;
     }
     long handle;if(!long.TryParse(File.ReadAllText(flag),out handle))return false;
@@ -91,6 +101,7 @@ namespace RiseOnAir {
    finally{try{if(File.Exists(flag))File.Delete(flag);}catch{}}
   }
   [STAThread] public static int Main(string[] args) {
+   AppDomain.CurrentDomain.ProcessExit+=(sender,eventArgs)=>Log("exit");
    Preview=args.Contains("--preview") || args.Contains("--self-test");
    Muted=args.Contains("--muted");
    Log("begin preview="+Preview+" muted="+Muted);
@@ -111,7 +122,7 @@ namespace RiseOnAir {
      var app=new Application {ShutdownMode=ShutdownMode.OnMainWindowClose};
      app.DispatcherUnhandledException+=(sender,eventArgs)=>{Log("unhandled "+eventArgs.Exception.Message);eventArgs.Handled=true;app.Shutdown(1);};
      app.Run(new WebLaunchWindow(args.Contains("--self-test")));
-     Log("exit");return 0;
+     Log("window-closed");StartupFinished.WaitOne();return 0;
     } catch(Exception ex) {
      Log("fatal "+ex);
      if(!Preview) {try {OpenCodex();} catch(Exception launchError) {MessageBox.Show("无法打开 Codex："+launchError.Message,"Rise On Air");}}

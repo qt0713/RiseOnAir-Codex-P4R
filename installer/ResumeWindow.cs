@@ -9,9 +9,9 @@ namespace RiseOnAir {
   [DllImport("user32.dll")]static extern bool GetWindowRect(IntPtr h,out Rect r);
   [DllImport("user32.dll")]static extern IntPtr SetThreadDpiAwarenessContext(IntPtr value);
   [DllImport("user32.dll")]static extern bool ShowWindowAsync(IntPtr h,int c);
+  [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int width,int height,uint flags);
   [DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")]static extern bool IsIconic(IntPtr h);
-  [DllImport("user32.dll")]static extern bool SetForegroundWindow(IntPtr h);
   public static long Restore(int process,double x,double y,double width,double height,double dpr) {
    IntPtr best=IntPtr.Zero;double score=double.MaxValue,second=double.MaxValue;
    var old=SetThreadDpiAwarenessContext(new IntPtr(-4));
@@ -30,7 +30,14 @@ namespace RiseOnAir {
     return true;
    },IntPtr.Zero);}finally{SetThreadDpiAwarenessContext(old);}
    if(best==IntPtr.Zero||second-score<4)throw new InvalidOperationException("No unique native main window matches the verified renderer.");
-   ShowWindowAsync(best,IsIconic(best)?9:5);SetForegroundWindow(best);return best.ToInt64();
+   // The launcher owns foreground until its window is gone. A hidden worker
+   // must not activate Codex behind a topmost WebView during the intro.
+   if(IsIconic(best))ShowWindowAsync(best,4);
+   else if(!IsWindowVisible(best))ShowWindowAsync(best,8);
+   // Above ordinary windows, below the topmost intro, without taking focus.
+   // A fully occluded Chromium window reports document.visibilityState=hidden.
+   SetWindowPos(best,IntPtr.Zero,0,0,0,0,0x53);
+   return best.ToInt64();
   }
  }
 }

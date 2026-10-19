@@ -17,6 +17,7 @@ namespace RiseOnAir {
   readonly Stopwatch lifetime=Stopwatch.StartNew();
   readonly bool selfTest;
   bool playing,waiting,closing,activationRequested,introFinished,waitNoticeShown;
+  int activationInFlight;
   double playStart,waitStart;
   [DllImport("user32.dll")] static extern bool ReleaseCapture();
   [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd,uint message,IntPtr wParam,IntPtr lParam);
@@ -27,8 +28,10 @@ namespace RiseOnAir {
    SourceInitialized+=(s,e)=>WindowPlacement.Attach(this);
    browser.DefaultBackgroundColor=System.Drawing.Color.FromArgb(255,36,33,36);Content=browser;
    Loaded+=async(s,e)=>{Program.Log("window-shown renderer=WebView2");if(!Program.Preview)RequestCodex();await Initialize();};
+   // Never keep an intro/wait surface above another app the user selects.
+   Deactivated+=(s,e)=>{Topmost=false;};
    timer.Interval=TimeSpan.FromMilliseconds(100);timer.Tick+=(s,e)=>Tick();timer.Start();
-   Closing+=(s,e)=>{closing=true;timer.Stop();browser.Dispose();};
+   Closing+=(s,e)=>{Program.IntroFinished.Set();closing=true;timer.Stop();ReleaseCapture();System.Windows.Input.Mouse.Capture(null);Topmost=false;browser.Dispose();};
    Closed+=(s,e)=>{if(!Program.Preview)Program.Activate(Program.CodexWindow());};
   }
   async Task Initialize() {
@@ -65,15 +68,16 @@ namespace RiseOnAir {
    }
   }
   void RequestCodex() {
-   if(activationRequested)return;activationRequested=true;
-   Task.Run(()=>{try{Program.OpenCodex();}catch(Exception ex){Program.Log("activation-error "+ex.Message);Dispatcher.BeginInvoke(new Action(()=>{waiting=false;Script("showWaiting(true)");}));}});
+   if(activationRequested||System.Threading.Interlocked.CompareExchange(ref activationInFlight,1,0)!=0)return;activationRequested=true;
+   Program.StartupFinished.Reset();
+   // Skipping/closing the intro must not abort a still-starting application.
+   new System.Threading.Thread(()=>{try{Program.OpenCodex();}catch(Exception ex){Program.ResumeFailed=true;Program.Log("activation-error "+ex.Message);if(!closing)Dispatcher.BeginInvoke(new Action(()=>{waiting=true;Script("showWaiting(true)");}));}finally{System.Threading.Interlocked.Exchange(ref activationInFlight,0);Program.StartupFinished.Set();}}){IsBackground=false,Name="Rise On Air startup"}.Start();
   }
   void Tick() {
    if(closing)return;
    if(waiting) {
-    if(Program.ExistingSession&&Program.ResumeCompleted&&Program.CodexWindow()!=IntPtr.Zero){Program.Log("handoff-resumed-window theme-check-continues");FadeClose();return;}
-    if(Program.ResumeFailed&&!waitNoticeShown){waitNoticeShown=true;Script("showWaiting(true)");}
-    if(Program.IsReady()){FadeClose();return;}
+    if(Program.ResumeFailed&&!waitNoticeShown){Topmost=false;waitNoticeShown=true;Script("showWaiting(true)");}
+    if(Program.StartupFinished.WaitOne(0)&&Program.IsReady()&&!Program.ResumeFailed){Program.Log("handoff-verified-window");FadeClose();return;}
     if(lifetime.Elapsed.TotalSeconds-waitStart>45&&!waitNoticeShown){waitNoticeShown=true;Script("showWaiting(true)");}return;
    }
    if(introFinished)return;
@@ -82,19 +86,18 @@ namespace RiseOnAir {
   }
   void Script(string code){if(browser.CoreWebView2!=null&&!closing)browser.CoreWebView2.ExecuteScriptAsync(code);}
   void Finish(string reason) {
+   Program.IntroFinished.Set();
    // Esc must also work after the animation has entered the waiting state.
    if(closing)return;
    if(reason=="skip"){Program.Log("finish skip");FadeClose();return;}
-   if(waiting||introFinished)return;introFinished=true;Program.Log("finish "+reason);
-   if(Program.ExistingSession && Program.ResumeCompleted && Program.CodexWindow()!=IntPtr.Zero) {
-    Program.Log("handoff-existing-window theme-check-continues");FadeClose();return;
-   }
-   if(Program.Preview||reason=="skip"||Program.IsReady()){FadeClose();return;}
+   if(waiting||introFinished)return;introFinished=true;Topmost=false;Program.Log("finish "+reason);
+   if(Program.Preview||(Program.StartupFinished.WaitOne(0)&&Program.IsReady()&&!Program.ResumeFailed)){FadeClose();return;}
    playing=false;waiting=true;waitStart=lifetime.Elapsed.TotalSeconds;Script(Program.ResumeFailed?"showWaiting(true)":"showWaiting(false)");
   }
   void FadeClose() {
    if(closing)return;closing=true;timer.Stop();
-   var fade=new DoubleAnimation(Opacity,0,TimeSpan.FromMilliseconds(160));fade.Completed+=(s,e)=>Close();BeginAnimation(OpacityProperty,fade);
+   ReleaseCapture();System.Windows.Input.Mouse.Capture(null);IsHitTestVisible=false;
+   var fade=new DoubleAnimation(Opacity,0,TimeSpan.FromMilliseconds(160));fade.Completed+=(s,e)=>{Hide();Close();};BeginAnimation(OpacityProperty,fade);
   }
  }
 }

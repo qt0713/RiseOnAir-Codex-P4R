@@ -37,6 +37,8 @@ namespace RiseOnAir {
       small=LoadImage(IntPtr.Zero,icon,1,32,32,0x10);big=LoadImage(IntPtr.Zero,icon,1,64,64,0x10);
       if(small==IntPtr.Zero||big==IntPtr.Zero)throw new InvalidOperationException("Rise icon could not be loaded.");
       oldSmall=Message(window,0x7f,0,IntPtr.Zero);oldBig=Message(window,0x7f,1,IntPtr.Zero);
+      var self=Process.GetCurrentProcess();
+      File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"icon-bridge.json"),"{\"bridgePid\":"+self.Id+",\"bridgeTicks\":"+self.StartTime.ToUniversalTime().Ticks+",\"appPid\":"+pid+",\"appTicks\":"+ticks+",\"window\":"+window.ToInt64()+"}");
       using(var stop=new EventWaitHandle(false,EventResetMode.ManualReset,StopName)) {
        stop.Reset();Log("attached pid="+pid);
        while(!app.HasExited&&OwnsWindow(window,pid)) {
@@ -54,6 +56,7 @@ namespace RiseOnAir {
       try {if(big!=IntPtr.Zero&&Message(window,0x7f,1,IntPtr.Zero)==big)Message(window,0x80,1,oldBig);}catch{}
      }
      if(small!=IntPtr.Zero)DestroyIcon(small);if(big!=IntPtr.Zero)DestroyIcon(big);
+     try{File.Delete(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"icon-bridge.json"));}catch{}
      Log("detached pid="+pid);gate.ReleaseMutex();
     }
    }
