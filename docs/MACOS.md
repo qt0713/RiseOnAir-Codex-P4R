@@ -59,3 +59,9 @@ GitHub Actions 在 `macos-15`（Apple Silicon）和 `macos-15-intel` 上编译 U
 主题验证通过前不会报告启动成功；动画播放与主题恢复并行，验证和播放均完成后才交接。AppKit 负责已有应用激活，不使用 Windows 专用 IPC。修复预览重播等待层残留，重复点击重试不会开启并行操作。Mac 原本只在安装阶段复制主题素材，本轮未引入 Windows 的每次素材导入流程。
 
 CI 新增已有主题直接复用、缺失主题恢复、恢复失败不报告成功三类夹具测试。运行中的真实登录窗口、冷启动耗时及系统重启恢复仍待真实 Mac 验收，不沿用 Windows 的测速结论。
+
+## beta.3 原生 CI 验收记录
+
+2026-10-20，[GitHub Actions run 39396182084](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39396182084) 的 macos-15、macos-15-intel 和 release 三项全部成功。双平台均完成 Universal 编译、原生 WKWebView/音频/截图、资源安全及启动分支回归测试、签名校验和 DMG 挂载。
+
+发布源码提交为 e85642f，DMG、ZIP 和 SHA256SUMS-macos.txt 已公开上传至 [beta.3 Release](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.3)。这不替代真实登录用户的客户端冷启动与后台恢复验收。
