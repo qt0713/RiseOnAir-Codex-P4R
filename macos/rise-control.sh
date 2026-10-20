@@ -6,6 +6,10 @@ ENGINE="$SUPPORT/engine"
 STATE="$SUPPORT/DreamSkin"
 ACTION="${1:-launch}"
 phase() { printf '%s action=%s %s\n' "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)" "$ACTION" "$1"; }
+audit_later() {
+  # Full audit is read-only, cannot undo startup, and never delays handoff.
+  /usr/bin/nohup /usr/bin/env -u RISE_FIRST_PAINT "$0" audit </dev/null > "$SUPPORT/background-audit.log" 2>&1 &
+}
 safe_path() {
   local p="$1"
   while [ "$p" != / ] && [ -n "$p" ]; do
@@ -107,29 +111,43 @@ case "$ACTION" in
     if [ ! -f "$SUPPORT/installed-version" ] || ! /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version"; then
       "$0" install
     fi
-    phase verify-existing
-    if "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json" 2> "$SUPPORT/last-verification-error.log"; then
+    export RISE_FIRST_PAINT=1
+    phase first-paint-existing
+    if RISE_VERIFY_TIMEOUT_MS=1500 "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json" 2> "$SUPPORT/last-verification-error.log"; then
       register_login
+      audit_later
       phase ready-existing
       exit 0
     fi
     phase start-session
     "$ENGINE/scripts/start-dream-skin-macos.sh" --prompt-restart
-    phase verify-started
-    "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json"
+    # The pinned starter commits active state only after its own verification.
+    # Cancellation exits 20; set -e rejects it instead of treating it as ready.
+    phase first-paint-confirmed-by-start
     register_login
+    audit_later
     phase ready-started ;;
   login)
     # Never install, ask for restart or close an existing session at login.
     [ -f "$SUPPORT/installed-version" ] && /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version" || exit 1
     [ -f "$ENGINE/RISE-OWNED" ] || exit 1
+    export RISE_FIRST_PAINT=1
     "$ENGINE/scripts/start-dream-skin-macos.sh"
-    exec "$ENGINE/scripts/verify-dream-skin-macos.sh" ;;
+    audit_later ;;
+  audit)
+    unset RISE_FIRST_PAINT
+    [ -f "$ENGINE/RISE-OWNED" ] || exit 1
+    lock="$SUPPORT/.audit-lock"
+    # Only one background audit at a time; no app or theme mutation.
+    /bin/mkdir "$lock" 2>/dev/null || exit 0
+    trap '/bin/rmdir "$lock" 2>/dev/null || true' EXIT
+    "$ENGINE/scripts/verify-dream-skin-macos.sh" ;;
   restore)
     [ -f "$ENGINE/RISE-OWNED" ] || { printf '未发现本项目已安装的引擎。\n' >&2; exit 1; }
     remove_login
     exec "$ENGINE/scripts/restore-dream-skin-macos.sh" --restore-base-theme --restart-codex ;;
   verify)
+    unset RISE_FIRST_PAINT
     [ -f "$ENGINE/RISE-OWNED" ] || exit 1
     exec "$ENGINE/scripts/verify-dream-skin-macos.sh" ;;
   *) printf 'Unknown action.\n' >&2; exit 2 ;;

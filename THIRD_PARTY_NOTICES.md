@@ -2,6 +2,8 @@
 
 本项目是个人同人主题，不是 ATLUS、SEGA 或 OpenAI 官方产品。源代码的 MIT 许可不覆盖第三方人物、录音、字体或运行库。
 
+Windows 1.0.7 / Mac beta.4 的启动重构参考 [yushua0808-cpu/dragon-codex-boot](https://github.com/yushua0808-cpu/dragon-codex-boot/tree/c63a203e5857e85fb3c8a9891eddb570e7a27b54)（MIT）的并行启动与窗口交接思路，本次没有复制其源码或媒体。新增首帧检测为本项目实现；完整 Dream Skin 审计保留为后台及手动验证。
+
 | 项目或素材 | 来源、用途与许可边界 |
 | --- | --- |
 | Codex Dream Skin | [Fei-Away/Codex-Dream-Skin](https://github.com/Fei-Away/Codex-Dream-Skin)，固定使用 [v1.5.21](https://github.com/Fei-Away/Codex-Dream-Skin/releases/tag/v1.5.21)，MIT。负责真实客户端的主题加载、原生控件兼容、主题包校验和恢复。本项目不是该项目的官方发行版。完整许可见 `licenses/Codex-Dream-Skin-MIT.txt`。 |

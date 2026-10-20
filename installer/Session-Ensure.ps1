@@ -8,9 +8,9 @@ function Ensure-RiseThemeSession {
   $state=Read-DreamSkinState -Path (Join-Path $Record.stateRoot 'state.json')
   $preferred=if($state -and $state.port){[int]$state.port}else{9335}
   $live=Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $preferred
-  . (Join-Path $PSScriptRoot 'Window-Resume.ps1')
-  $installRoot=Split-Path -Parent $PSScriptRoot
-  if($live){$null=Restore-RiseThemeWindow -Record $Record -Codex $live.Codex -Identity $live.Identity -Port $preferred -InstallRoot $installRoot -IntroEventName $IntroEventName;return $preferred}
+  # Let injection begin as soon as the identity-bound endpoint is available.
+  # Theme-Control restores the real window after recording the new watcher.
+  if($live){return $preferred}
   $codex=Get-DreamSkinCodexInstall
   $profile=Join-Path $Record.stateRoot 'cdp-profile'
   Assert-DreamSkinNoReparseComponents -Path $profile
@@ -27,7 +27,7 @@ function Ensure-RiseThemeSession {
    $deadline=[DateTime]::UtcNow.AddSeconds(45)
    do {
     $identity=Get-DreamSkinVerifiedCdpIdentity -Port $port -Codex $codex
-    if($identity){$null=Restore-RiseThemeWindow -Record $Record -Codex $codex -Identity $identity -Port $port -InstallRoot $installRoot -IntroEventName $IntroEventName;return $port}
+    if($identity){return $port}
     Start-Sleep -Milliseconds 200
    }while([DateTime]::UtcNow -lt $deadline)
    throw 'A verified theme listener did not start. All pre-existing Codex processes were preserved.'

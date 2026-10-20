@@ -20,8 +20,12 @@ try {
  $theme=Get-Content -LiteralPath (Join-Path $active 'theme.json') -Raw -Encoding UTF8|ConvertFrom-Json
  if($theme.id -ne 'p4r-rise-on-air'){throw 'Rise theme is not active.'}
  $node=Get-DreamSkinNodeRuntime
+ $env:RISE_FIRST_PAINT='1'
+ $env:RISE_NATIVE_HANDOFF='1'
  Invoke-RiseProcess -File $node.Path -Arguments @((Join-Path $record.stateRoot 'engine\scripts\injector.mjs'),'--verify','--port',[string]$state.port,'--browser-id',$identity.BrowserId,'--theme-dir',$active,'--timeout-ms','5000') -LogPrefix (Join-Path $install 'logs\resume-theme-verify')
  . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
  try{Set-RiseWindowRelaunch -InstallRoot $install -Record $record -NativeWindow $window}catch{$_|Out-File (Join-Path $install 'logs\window-decoration-error.txt') -Encoding UTF8}
+ if(-not [RiseOnAir.ResumeWindow]::IsWindowVisible([IntPtr]$window)){throw 'Main window was hidden before handoff.'}
  [IO.File]::WriteAllText((Join-Path $install ('Resume-'+$LaunchToken+'.flag')),[string]$window)
+ Start-RiseBackgroundAudit -InstallRoot $install
 }catch{$_|Out-File (Join-Path $install 'logs\resume-error.txt') -Encoding UTF8;exit 1}

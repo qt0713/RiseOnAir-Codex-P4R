@@ -22,15 +22,50 @@ function Set-RiseSurfaceAdapter {
   $anchor='const combinedCss = loadedTheme.safeCssRuntime'
   $replacement=$marker+"`n"+'  const riseSurfaceCss = loadedTheme.theme.id === "p4r-rise-on-air" ? await fs.readFile(path.join(root, "assets", "rise-surfaces.css"), "utf8") : "";'+"`n"+'  const combinedCss = (loadedTheme.safeCssRuntime'
   $patched=$original.Replace($anchor,$replacement).Replace(': css;',': css) + "\n" + riseSurfaceCss;')
-  if($current.Contains($marker) -and $current -cne $patched){throw 'Adapter was modified externally; refusing to overwrite it.'}
+  $legacyPatched=$patched
+  $verifyAnchor='  const nativeWindow = await inspectTargetWindow(session, targetId);'
+  $verifyHook='  if (process.env.RISE_FIRST_PAINT === "1") return (await import("./rise-first-paint.mjs")).verifyFirstPaint(session, expectedThemeId, expectedRevision, SKIN_VERSION);'
+  if(-not $original.Contains($verifyAnchor)){throw 'Startup verification anchor not found.'}
+  $patched=$patched.Replace($verifyAnchor,$verifyHook+"`n"+$verifyAnchor)
+  if($current.Contains($marker) -and $current -cne $patched -and $current -cne $legacyPatched){throw 'Adapter was modified externally; refusing to overwrite it.'}
+  $firstPaint=Join-Path $StateRoot 'engine\scripts\rise-first-paint.mjs'
+  Assert-DreamSkinNoReparseComponents -Path $firstPaint
+  # The startup script is separately pinned and backed up; install/manual
+  # operations retain the original full preset initialization.
+  $starter=Join-Path $StateRoot 'engine\scripts\start-dream-skin.ps1'
+  $starterBackup=$starter+'.rise-original'
+  foreach($path in @($starter,$starterBackup)){Assert-DreamSkinNoReparseComponents -Path $path}
+  $starterHash='01368904D63812B208D1200E8271568E0315202713B57D710901F534FCC94902'
+  $starterOriginalPath=if(Test-Path -LiteralPath $starterBackup){$starterBackup}else{$starter}
+  if((Get-FileHash -LiteralPath $starterOriginalPath).Hash -ne $starterHash){throw 'Unsupported startup engine; existing files preserved.'}
+  $starterOriginal=[IO.File]::ReadAllText($starterOriginalPath)
+  $initAnchor='  $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot'
+  $initReplacement=@'
+  if ($env:RISE_FIRST_PAINT -eq '1' -and (Test-Path -LiteralPath (Join-Path $StateRoot 'active-theme\theme.json'))) {
+    $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
+    Invoke-DreamSkinThemeReplacementRecovery -Paths $themePaths
+    $null = Read-DreamSkinTheme -ThemeDirectory $themePaths.Active
+  } else {
+    $themePaths = Initialize-DreamSkinThemeStore -SkillRoot (Split-Path -Parent $PSScriptRoot) -StateRoot $StateRoot
+  }
+'@
+  if(-not $starterOriginal.Contains($initAnchor)){throw 'Startup initialization anchor not found.'}
+  $starterPatched=$starterOriginal.Replace($initAnchor,$initReplacement)
+  $starterCurrent=[IO.File]::ReadAllText($starter)
+  if($starterCurrent -cne $starterOriginal -and $starterCurrent -cne $starterPatched){throw 'Startup adapter was modified externally.'}
   if($Remove){
    if($current.Contains($marker)){[IO.File]::Copy($backup,$injector,$true)}
+   if(Test-Path -LiteralPath $starterBackup){[IO.File]::Copy($starterBackup,$starter,$true)}
+   if(Test-Path -LiteralPath $firstPaint){Remove-Item -LiteralPath $firstPaint -Force}
    if(Test-Path -LiteralPath $extension){Remove-Item -LiteralPath $extension -Force}
    return
   }
   if(-not $original.Contains($anchor)){throw 'Upstream adapter anchor not found.'}
   if(-not(Test-Path -LiteralPath $backup)){[IO.File]::Copy($injector,$backup,$false)}
+  if(-not(Test-Path -LiteralPath $starterBackup)){[IO.File]::Copy($starter,$starterBackup,$false)}
+  [IO.File]::Copy((Join-Path $InstallRoot 'runtime\first-paint.mjs'),$firstPaint,$true)
   [IO.File]::Copy((Join-Path $InstallRoot 'runtime\rise-surfaces.css'),$extension,$true)
   if($current -cne $patched){[IO.File]::WriteAllText($injector,$patched,(New-Object Text.UTF8Encoding($false)))}
+  if($starterCurrent -cne $starterPatched){[IO.File]::WriteAllText($starter,$starterPatched,(New-Object Text.UTF8Encoding($true)))}
  } finally {Exit-DreamSkinOperationLock -Mutex $lock}
 }

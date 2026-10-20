@@ -29,7 +29,9 @@ jobs:
       - name: Build universal native app
         run: bash tools/build-macos.sh
       - name: Test AppKit, WebKit, audio metadata and resource safety
-        run: bash macos/tests/native.sh
+        run: |
+          node tools/test-first-paint.mjs
+          bash macos/tests/native.sh
       - name: Package DMG and ZIP
         run: bash tools/package-macos.sh
       - name: Mount and verify DMG

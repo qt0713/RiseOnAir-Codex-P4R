@@ -45,6 +45,25 @@ Write-TestFile 'state\engine\scripts\theme-windows.ps1' 'function Get-DreamSkinT
 Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' 'param([string]$SavedThemeDirectory,[switch]$RequireUnpaused) if($SavedThemeDirectory -ne "fixture"){exit 79};exit 0'
 & $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
 if($LASTEXITCODE -ne 0){throw 'Changed theme content must still select the saved theme.'}
+# A transaction-specific success removes the second verifier, but a zero exit
+# without that result (including cancelled restart) must still fail closed.
+Write-TestFile 'state\engine\scripts\common-windows.ps1' @'
+function Get-DreamSkinStartResultPath {param($StateRoot,$Token) Join-Path $StateRoot ('.start-result-'+$Token+'.json')}
+function Read-DreamSkinStartResult {param($StateRoot,$Token)
+ $r=Get-Content (Get-DreamSkinStartResultPath $StateRoot $Token) -Raw|ConvertFrom-Json
+ if($r.token -cne $Token){throw 'Token mismatch'};return $r
+}
+'@
+Write-TestFile 'state\engine\scripts\verify-dream-skin.ps1' 'exit 88'
+Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' @'
+param($SavedThemeDirectory,[switch]$RequireUnpaused,$ResultToken)
+@{token=$ResultToken;outcome='success';category='none'}|ConvertTo-Json|Set-Content (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) ('.start-result-'+$ResultToken+'.json'))
+'@
+& $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
+if($LASTEXITCODE -ne 0){throw 'Confirmed transaction must not repeat full verification.'}
+Write-TestFile 'state\engine\scripts\start-dream-skin.ps1' 'exit 0'
+& $ps -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $test 'scripts\Theme-Control.ps1') -LaunchToken $token
+if($LASTEXITCODE -eq 0 -or (Test-Path (Join-Path $test 'LaunchReady.flag'))){throw 'Missing transaction result must fail closed.'}
 Add-Type -Path (Join-Path $root 'installer\ShellIdentity.cs')
 $shortcut=Join-Path $test 'Property store test.lnk'
 $link=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)

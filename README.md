@@ -10,13 +10,13 @@
 
 ## macOS 版（Beta）
 
-原生 AppKit / WKWebView 启动器、Universal 二进制、理世 ICNS 图标和 DMG/ZIP。[下载 macOS Beta](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.3)，安装与测试范围见 **[macOS 中文说明](docs/MACOS.md)**。macOS 版与 Windows 安装包分开发布；Beta 不代表真实登录用户的主题接入已经全场景验收。
+原生 AppKit / WKWebView 启动器、Universal 二进制、理世 ICNS 图标和 DMG/ZIP。[下载 macOS Beta](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.4)，安装与测试范围见 **[macOS 中文说明](docs/MACOS.md)**。macOS 版与 Windows 安装包分开发布；Beta 不代表真实登录用户的主题接入已经全场景验收。
 
 ## Windows 一键安装
 
 前往 **[Releases 下载 Windows 安装包](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/latest)**：
 
-1. 下载 Release 中实际列出的 Windows EXE（当前公开稳定版为 `RiseOnAir-Setup-v1.0.5-windows-x64.exe`）；可用同页 `SHA256SUMS.txt` 核对摘要。
+1. 下载 Release 中实际列出的 Windows EXE（当前公开版为 `RiseOnAir-Setup-v1.0.7-windows-x64.exe`）；可用同页 `SHA256SUMS.txt` 核对摘要。
 2. 保存 Codex 中尚未发送的输入，然后运行安装包。首次配置或需要更新引擎时可能关闭客户端；按当前用户安装，无需接管 WindowsApps。
 3. 保持安装完成页的“启动 Codex 并应用理世主题”选项，或双击桌面 **Codex - 理世启动**。
 4. 打开 Windows **设置 → 应用 → 启动**，关闭 OpenAI 的 **Codex / ChatGPT** 普通登录启动，保留 **RiseOnAir.exe** 开启。这一步避免官方普通模式抢先启动；Windows 上该包目前显示名可能为 ChatGPT。不要同时开启两个入口。
@@ -36,9 +36,17 @@
 
 快捷方式直接引用安装目录中的 `rise-icon-v1.ico`，同时可执行文件内嵌同一图标。ICO 包含 **16 / 24 / 32 / 48 / 64 / 128 / 256 px**，保留透明圆角。安装结束会通知 Windows Shell 刷新，避免依赖工作区或临时目录中的图片。
 
-## v1.0.6 候选：窗口输入交接与失效会话恢复
+## v1.0.7 / macOS beta.4：缩短启动检查链路
 
-本节对应源码与本地候选安装包；完全无后台冷启动仍需复核，尚未替换公开稳定版安装包。
+启动动画与应用启动并行。首帧检查确认主题 ID、payload 版本、活动样式、已解码且实际绘制的本地壁纸、基础页面结构；完整布局审计改为独立后台检查，不再阻塞交接，也不会因审计失败撤销主题。手动“验证”仍执行完整检查。
+
+Windows 保留注册包、端口所有者、Browser ID 和主窗口 HWND 校验。对于被其他窗口完全遮挡而被 Chromium 标记为 hidden 的页面，必须另外通过本机真实窗口可见性检查后才能交接。初始化主题库移至安装阶段，正常启动只恢复未完成事务并校验活动主题；注入不再等待窗口恢复完成才开始。Mac 已有会话探测最多等待 1.5 秒，避免无主题时先等 30 秒才启动注入。
+
+实现参考 [dragon-codex-boot](https://github.com/yushua0808-cpu/dragon-codex-boot) 的“播放与启动并行、可用窗口交接”思路；该项目没有主题注入，不能用它的窗口出现条件代替本项目的主题检查。详见 [启动检查与回退说明](docs/STARTUP-FIRST-PAINT.md)。
+
+## v1.0.6：窗口输入交接与失效会话恢复
+
+以下记录上一轮窗口恢复修复。完全无后台、系统重启后的行为仍需结合实际机器复核。
 
 修复启动等待页一直置顶、切回其他窗口时可能挡住点击的问题。动画结束或用户切换应用后立即撤销置顶；关闭窗口时释放鼠标捕获。后台仅准备窗口，隐藏主窗口通过客户端自身的 `open-current-main-window` 流程恢复，等动画完成后才交接，避免只修改 Win32 可见性而留下 Electron 内部的隐藏状态。
 

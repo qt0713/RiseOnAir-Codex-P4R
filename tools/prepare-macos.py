@@ -52,7 +52,17 @@ def prepare(upstream=None):
     if injector.count(anchor) != 1:
         raise RuntimeError("Mac injector adapter anchor changed")
     injector = injector.replace(anchor, 'const riseSurfaceCss = theme.id === "p4r-rise-on-air" ? await fs.readFile(path.join(root, "assets", "rise-surfaces.css"), "utf8") : "";\n  const combinedCss = (safeCssRuntime ? `${css}\\n${safeCssRuntime}\\n` : css) + "\\n" + riseSurfaceCss;')
+    verify_anchor = 'export async function verifySession(session, expectedThemeId = null, expectedRevision = null) {'
+    if injector.count(verify_anchor) != 1:
+        raise RuntimeError("Mac first-paint adapter anchor changed")
+    injector = injector.replace(verify_anchor, verify_anchor + '\n  if (process.env.RISE_FIRST_PAINT === "1") return (await import("./rise-first-paint.mjs")).verifyFirstPaint(session, expectedThemeId, expectedRevision, SKIN_VERSION);')
+    files["scripts/rise-first-paint.mjs"] = (ROOT / "src/runtime/first-paint.mjs").read_bytes()
     files["scripts/injector.mjs"] = injector.encode()
+    verifier = files["scripts/verify-dream-skin-macos.sh"].decode()
+    if verifier.count('--timeout-ms 30000') != 1:
+        raise RuntimeError("Mac verification timeout anchor changed")
+    files["scripts/verify-dream-skin-macos.sh"] = verifier.replace(
+        '--timeout-ms 30000', '--timeout-ms "${RISE_VERIFY_TIMEOUT_MS:-30000}"').encode()
     preferences = files["assets/theme-preferences.mjs"].decode().replace('"CodexDreamSkinStudio"', '"RiseOnAir", "DreamSkin"')
     files["assets/theme-preferences.mjs"] = preferences.encode()
     for name, content in files.items():

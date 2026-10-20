@@ -53,8 +53,35 @@ with tempfile.TemporaryDirectory(prefix="rise-macos-test-") as temporary:
     result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
     assert result.returncode == 0 and b"ready-started" in result.stdout, result.stderr
     verifier.write_text("#!/bin/bash\nexit 1\n")
+    starter.write_text("#!/bin/bash\nexit 7\n")
     result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
     assert result.returncode != 0 and b"ready-started" not in result.stdout
+    starter.write_text("#!/bin/bash\nexit 20\n")
+    result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
+    assert result.returncode == 20 and b"ready-started" not in result.stdout
+    # A slow/failing full audit must be detached, without the startup override.
+    import time
+    (scripts.parent / "RISE-OWNED").write_text("fixture")
+    verifier.write_text('''#!/bin/bash
+if [ "${RISE_FIRST_PAINT:-}" = 1 ]; then
+  test "${RISE_VERIFY_TIMEOUT_MS:-}" = 1500
+  exit $?
+fi
+sleep 2
+touch "$(dirname "$0")/audit-failed"
+exit 7
+''')
+    started = time.monotonic()
+    result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=10)
+    assert result.returncode == 0 and b"ready-existing" in result.stdout
+    assert time.monotonic() - started < 2, "Full audit blocked startup"
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline and not (scripts / "audit-failed").exists():
+        time.sleep(0.1)
+    assert (scripts / "audit-failed").exists(), "Background audit was skipped or inherited first-paint mode"
+    while (fixture_support / ".audit-lock").exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert not (fixture_support / ".audit-lock").exists()
     # Exercise the real login-item writer with XML metacharacters in HOME.
     import plistlib
     login_home = home / 'login & <test>'

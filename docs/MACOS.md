@@ -1,11 +1,11 @@
 # macOS 下载与使用
 
-macOS 当前版为 **1.1.0-beta.3**，提供 Universal 原生应用（Apple Silicon / Intel），最低 macOS 14。
+macOS 当前版为 **1.1.0-beta.4**，提供 Universal 原生应用（Apple Silicon / Intel），最低 macOS 14。
 
 ## 安装
 
 1. 先安装并运行官方 Codex / 新版 ChatGPT 桌面客户端一次，再退出。主题引擎要求官方包 ID `com.openai.codex`，并校验其应用签名、OpenAI Team ID 和自带 Node 运行时；缺少合格运行时会停止，不会要求安装 Homebrew 或来历不明的 Node。
-2. 下载 `RiseOnAir-v1.1.0-beta.3-macos-universal.dmg`，打开后把 **Rise On Air.app** 拖入 Applications。也提供 ZIP 作为替代。
+2. 下载 `RiseOnAir-v1.1.0-beta.4-macos-universal.dmg`，打开后把 **Rise On Air.app** 拖入 Applications。也提供 ZIP 作为替代。
 3. 打开 Rise On Air，按原生提示安装并启动。首次配置或引擎升级前请保存输入并退出官方客户端；后续客户端已经运行时，先验证当前主题；通过则直接复用，失败才尝试恢复，仍须再次验证。冷热启动均播放展示动画。
 
 ## 登录恢复与 Dock 入口

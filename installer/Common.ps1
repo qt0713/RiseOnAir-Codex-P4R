@@ -19,6 +19,15 @@ function Invoke-RiseProcess {
  } finally {$process.Dispose()}
 }
 function Get-RisePowerShell {return (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe')}
+function Start-RiseBackgroundAudit {
+ param([string]$InstallRoot)
+ # Audit is read-only and detached. Its failure cannot roll back a painted
+ # theme or hold the animation open. Manual Verify still returns full results.
+ $script=Join-Path $InstallRoot 'scripts\Background-Audit.ps1'
+ if(Test-Path -LiteralPath $script){
+  try{Start-Process -FilePath (Get-RisePowerShell) -WindowStyle Hidden -ArgumentList ('-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "'+$script+'"')|Out-Null}catch{}
+ }
+}
 function Read-RiseIntegration {
  param([string]$InstallRoot)
  $record=Get-Content -LiteralPath (Join-Path $InstallRoot 'integration.json') -Raw -Encoding UTF8|ConvertFrom-Json

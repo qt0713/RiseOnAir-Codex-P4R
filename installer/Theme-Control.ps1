@@ -25,6 +25,8 @@ try {
  } elseif($Action -eq 'Manager'){
   & (Join-Path $engineScripts 'tray-dream-skin.ps1') -ShowWindow
  } else {
+  $env:RISE_FIRST_PAINT='1'
+  if($EnsureSession -or $NativeWindow -ne 0){$env:RISE_NATIVE_HANDOFF='1'}else{$env:RISE_NATIVE_HANDOFF=$null}
   $sessionPort=$null
   if($EnsureSession){Write-LaunchPhase 'ensure-session';. (Join-Path $PSScriptRoot 'Session-Ensure.ps1');$sessionPort=Ensure-RiseThemeSession -Record $record -IntroEventName $IntroEventName;Write-LaunchPhase 'session-restored'}
   . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
@@ -55,6 +57,11 @@ try {
   }
   if(-not $alreadyVerified){
   Write-LaunchPhase 'apply-theme'
+  $resultToken=$null
+  if(Get-Command Read-DreamSkinStartResult -ErrorAction SilentlyContinue){
+   $resultToken=[Guid]::NewGuid().ToString('N')
+   $startArguments+=@('-ResultToken',$resultToken)
+  }
   $onStarted=$null
   if($sessionPort){
    $prior=Read-DreamSkinState -Path (Join-Path $record.stateRoot 'state.json')
@@ -73,16 +80,35 @@ try {
     }
    }catch{$handoff.done=$true;Write-LaunchPhase ('window-handoff-failed '+$_.Exception.Message)}}
   }
-  Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments $startArguments -LogPrefix (Join-Path $logDirectory 'start') -OnPoll $onStarted
+  try {
+   Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments $startArguments -LogPrefix (Join-Path $logDirectory 'start') -OnPoll $onStarted
+   if($resultToken){
+    $result=Read-DreamSkinStartResult -StateRoot $record.stateRoot -Token $resultToken
+    if($result.outcome -cne 'success' -or $result.category -cne 'none'){throw 'Upstream startup did not confirm this operation.'}
+    Write-LaunchPhase 'first-paint-confirmed-by-start-result'
+   }else{
   Write-LaunchPhase 'verify-theme'
   # Windows upstream returns zero when its native restart prompt is cancelled.
   # Verify the current Browser ID and renderer instead of trusting that exit.
   Invoke-RiseProcess -File (Get-RisePowerShell) -Arguments @('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',(Join-Path $engineScripts 'verify-dream-skin.ps1')) -LogPrefix (Join-Path $logDirectory 'launch-verify')
+   }
+  }finally{
+   if($resultToken){
+    $resultPath=Get-DreamSkinStartResultPath -StateRoot $record.stateRoot -Token $resultToken
+    if(Test-Path -LiteralPath $resultPath){Remove-Item -LiteralPath $resultPath -Force}
+   }
+  }
   }
   $active=Get-Content -LiteralPath (Join-Path $record.stateRoot 'active-theme\theme.json') -Raw -Encoding UTF8|ConvertFrom-Json
   if($active.id -ne 'p4r-rise-on-air'){throw 'The verified active theme is not Rise On Air.'}
   . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
   if($sessionPort -and $handoff.window){$NativeWindow=[long]$handoff.window}
+  if($EnsureSession){
+   if(-not $NativeWindow -or -not [RiseOnAir.ResumeWindow]::IsWindowVisible([IntPtr]$NativeWindow)){throw 'First paint requires a verified visible native main window.'}
+   $finalIdentity=Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $sessionPort
+   $finalState=Read-DreamSkinState -Path (Join-Path $record.stateRoot 'state.json')
+   if(!$finalIdentity -or !$finalState -or $finalIdentity.Identity.BrowserId -cne $finalState.browserId){throw 'Browser identity changed before first-paint handoff.'}
+  }
   try{Set-RiseWindowRelaunch -InstallRoot $installRoot -Record $record -NativeWindow $NativeWindow}catch{$_|Out-File (Join-Path $logDirectory 'window-decoration-error.txt') -Encoding UTF8}
   if(Test-Path -LiteralPath (Join-Path $logDirectory 'last-error.txt')){Remove-Item -LiteralPath (Join-Path $logDirectory 'last-error.txt')}
   if($LaunchToken){
@@ -90,6 +116,7 @@ try {
    [IO.File]::WriteAllText($readyFile,$LaunchToken)
   }
   Write-LaunchPhase 'ready'
+  Start-RiseBackgroundAudit -InstallRoot $installRoot
  }
 } catch {
  Write-LaunchPhase ('failed '+$_.Exception.Message)
