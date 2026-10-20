@@ -36,6 +36,25 @@ with tempfile.TemporaryDirectory(prefix="rise-macos-test-") as temporary:
     assert result.returncode != 0 and b"Could not find the official" in result.stderr
     assert not (home / "Library/Application Support/RiseOnAir/engine").exists()
     assert config.read_bytes() == before
+    # Exercise launch decisions without touching any real client or user state.
+    scripts = home / "Library/Application Support/RiseOnAir/engine/scripts"
+    scripts.mkdir(parents=True)
+    fixture_support = scripts.parent.parent
+    (fixture_support / "installed-version").write_bytes((r / "VERSION").read_bytes())
+    verifier = scripts / "verify-dream-skin-macos.sh"
+    starter = scripts / "start-dream-skin-macos.sh"
+    verifier.write_text("#!/bin/bash\nexit 0\n")
+    starter.write_text("#!/bin/bash\nexit 91\n")
+    verifier.chmod(0o755); starter.chmod(0o755)
+    result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
+    assert result.returncode == 0 and b"ready-existing" in result.stdout, result.stderr
+    verifier.write_text('#!/bin/bash\ntest -f "$(dirname "$0")/started"\n')
+    starter.write_text('#!/bin/bash\ntouch "$(dirname "$0")/started"\n')
+    result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
+    assert result.returncode == 0 and b"ready-started" in result.stdout, result.stderr
+    verifier.write_text("#!/bin/bash\nexit 1\n")
+    result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
+    assert result.returncode != 0 and b"ready-started" not in result.stdout
     # Exercise the real login-item writer with XML metacharacters in HOME.
     import plistlib
     login_home = home / 'login & <test>'

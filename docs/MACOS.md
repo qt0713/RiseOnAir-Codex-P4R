@@ -1,12 +1,12 @@
 # macOS 下载与使用
 
-macOS 当前版为 **1.1.0-beta.2**，提供 Universal 原生应用（Apple Silicon / Intel），最低 macOS 14。
+macOS 当前版为 **1.1.0-beta.3**，提供 Universal 原生应用（Apple Silicon / Intel），最低 macOS 14。
 
 ## 安装
 
 1. 先安装并运行官方 Codex / 新版 ChatGPT 桌面客户端一次，再退出。主题引擎要求官方包 ID `com.openai.codex`，并校验其应用签名、OpenAI Team ID 和自带 Node 运行时；缺少合格运行时会停止，不会要求安装 Homebrew 或来历不明的 Node。
-2. 下载 `RiseOnAir-v1.1.0-beta.2-macos-universal.dmg`，打开后把 **Rise On Air.app** 拖入 Applications。也提供 ZIP 作为替代。
-3. 打开 Rise On Air，按原生提示安装并启动。首次配置或引擎升级前请保存输入并退出官方客户端；后续客户端已经运行时，仍会验证并应用主题，再唤起窗口。
+2. 下载 `RiseOnAir-v1.1.0-beta.3-macos-universal.dmg`，打开后把 **Rise On Air.app** 拖入 Applications。也提供 ZIP 作为替代。
+3. 打开 Rise On Air，按原生提示安装并启动。首次配置或引擎升级前请保存输入并退出官方客户端；后续客户端已经运行时，先验证当前主题；通过则直接复用，失败才尝试恢复，仍须再次验证。冷热启动均播放展示动画。
 
 ## 登录恢复与 Dock 入口
 
@@ -53,3 +53,9 @@ GitHub Actions 在 `macos-15`（Apple Silicon）和 `macos-15-intel` 上编译 U
 ![Mac runner 原生窗口播放截图](macos-native-preview.png)
 
 构建来源为提交 `b1c2264be04f5c8bfdd311e3eb340c31df2bd518`；后续提交只补充测试记录与文档。下载包来自通过测试的 Apple Silicon runner，同一 Universal 二进制同时包含 arm64 与 x86_64。Intel runner 另行构建并运行了原生测试。
+
+## beta.3 同步修复
+
+主题验证通过前不会报告启动成功；动画播放与主题恢复并行，验证和播放均完成后才交接。AppKit 负责已有应用激活，不使用 Windows 专用 IPC。修复预览重播等待层残留，重复点击重试不会开启并行操作。Mac 原本只在安装阶段复制主题素材，本轮未引入 Windows 的每次素材导入流程。
+
+CI 新增已有主题直接复用、缺失主题恢复、恢复失败不报告成功三类夹具测试。运行中的真实登录窗口、冷启动耗时及系统重启恢复仍待真实 Mac 验收，不沿用 Windows 的测速结论。

@@ -10,7 +10,7 @@
 
 ## macOS 版（Beta）
 
-原生 AppKit / WKWebView 启动器、Universal 二进制、理世 ICNS 图标和 DMG/ZIP。[下载 macOS Beta](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.2)，安装与测试范围见 **[macOS 中文说明](docs/MACOS.md)**。macOS 版与 Windows 安装包分开发布；Beta 不代表真实登录用户的主题接入已经全场景验收。
+原生 AppKit / WKWebView 启动器、Universal 二进制、理世 ICNS 图标和 DMG/ZIP。[下载 macOS Beta](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.3)，安装与测试范围见 **[macOS 中文说明](docs/MACOS.md)**。macOS 版与 Windows 安装包分开发布；Beta 不代表真实登录用户的主题接入已经全场景验收。
 
 ## Windows 一键安装
 

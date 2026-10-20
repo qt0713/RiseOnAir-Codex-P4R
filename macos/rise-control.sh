@@ -5,6 +5,7 @@ SUPPORT="$HOME/Library/Application Support/RiseOnAir"
 ENGINE="$SUPPORT/engine"
 STATE="$SUPPORT/DreamSkin"
 ACTION="${1:-launch}"
+phase() { printf '%s action=%s %s\n' "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)" "$ACTION" "$1"; }
 safe_path() {
   local p="$1"
   while [ "$p" != / ] && [ -n "$p" ]; do
@@ -106,10 +107,18 @@ case "$ACTION" in
     if [ ! -f "$SUPPORT/installed-version" ] || ! /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version"; then
       "$0" install
     fi
+    phase verify-existing
+    if "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json" 2> "$SUPPORT/last-verification-error.log"; then
+      register_login
+      phase ready-existing
+      exit 0
+    fi
+    phase start-session
     "$ENGINE/scripts/start-dream-skin-macos.sh" --prompt-restart
+    phase verify-started
     "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json"
     register_login
-    printf 'Rise theme verified.\n' ;;
+    phase ready-started ;;
   login)
     # Never install, ask for restart or close an existing session at login.
     [ -f "$SUPPORT/installed-version" ] && /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version" || exit 1

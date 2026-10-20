@@ -31,16 +31,10 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         let version = try? String(contentsOf: resources.appendingPathComponent("VERSION"), encoding: .utf8)
         if !preview && installed == version && installed != nil,
            let codex = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first {
-            // A running native app can be missing the managed CDP session.
-            runControl("launch") { success in
-                codex.activate(options: [.activateAllWindows])
-                if !success {
-                    let alert = NSAlert(); alert.messageText = "理世主题尚未通过验证"
-                    alert.informativeText = "已保留当前 Codex 会话。请保存输入后退出 Codex，再打开理世启动器；日志位于 Library/Application Support/RiseOnAir。"
-                    alert.runModal()
-                }
-                NSApp.terminate(nil)
-            }; return
+            // Restore through AppKit before testing renderer visibility.
+            // The same animation/readiness path handles warm and cold launches.
+            codex.unhide()
+            codex.activate(options: [.activateAllWindows])
         }
         if !preview && installed != version {
             let alert = NSAlert()
@@ -108,7 +102,7 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         if value == "ended" {
             introEnded = true
             if selfTest { finishTest(error: nil) }
-            else if !preview { if ready { NSApp.terminate(nil) } else { waiting(false) } }
+            else if !preview { if ready { finishHandoff() } else { waiting(false) } }
         }
         if value == "skip" {
             skipped = true
@@ -117,6 +111,14 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         if value.hasPrefix("error ") { if selfTest { finishTest(error: value) } else { waiting(true) } }
     }
     func waiting(_ failed: Bool) { web?.evaluateJavaScript("riseHost.waiting(\(failed ? "true" : "false"))", completionHandler: nil) }
+    func finishHandoff() {
+        window?.orderOut(nil)
+        if let codex = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").first {
+            codex.unhide()
+            codex.activate(options: [.activateAllWindows])
+        }
+        NSApp.terminate(nil)
+    }
     func runControl(_ action: String, completion: @escaping (Bool) -> Void) {
         guard process == nil else { return }
         do {
@@ -149,7 +151,7 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func applyTheme() {
         runControl("launch") { [weak self] success in
             guard let self = self else { return }; self.ready = success
-            if success && (self.introEnded || self.skipped) { NSApp.terminate(nil) }
+            if success && (self.introEnded || self.skipped) { self.finishHandoff() }
             else if !success {
                 self.waiting(true)
                 let alert = NSAlert(); alert.messageText = "主题尚未确认加载"; alert.informativeText = "首次安装请先退出 Codex / ChatGPT，再从菜单重试。已安装时请检查官方客户端版本和日志。"; alert.addButton(withTitle: "显示日志"); alert.addButton(withTitle: "保留预览")
@@ -165,8 +167,18 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         exit(pass ? 0 : 1)
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool { if process != nil { skipped = true; sender.orderOut(nil); return false }; NSApp.terminate(nil); return true }
-    @objc func replay() { if web != nil { preview = true; web.evaluateJavaScript("riseHost.start({muted:false,preview:true})", completionHandler: nil) } }
-    @objc func retry() { preview = false; applyTheme() }
+    @objc func replay() {
+        guard process == nil, web != nil else { return }
+        introEnded = false; skipped = false; ready = false; preview = true
+        window.makeKeyAndOrderFront(nil)
+        web.evaluateJavaScript("riseHost.start({muted:false,preview:true})", completionHandler: nil)
+    }
+    @objc func retry() {
+        guard process == nil else { return }
+        preview = false; ready = false; skipped = false
+        window?.makeKeyAndOrderFront(nil)
+        applyTheme()
+    }
     @objc func showLogs() { NSWorkspace.shared.open(support) }
     @objc func restore() {
         let alert = NSAlert(); alert.messageText = "恢复官方外观"; alert.informativeText = "恢复会退出并重新打开 Codex / ChatGPT，请先保存输入。"; alert.addButton(withTitle: "恢复并重启"); alert.addButton(withTitle: "取消")
