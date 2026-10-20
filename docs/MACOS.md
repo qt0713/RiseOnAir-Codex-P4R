@@ -6,7 +6,7 @@ macOS 当前版为 **1.1.0-beta.4**，提供 Universal 原生应用（Apple Sili
 
 1. 先安装并运行官方 Codex / 新版 ChatGPT 桌面客户端一次，再退出。主题引擎要求官方包 ID `com.openai.codex`，并校验其应用签名、OpenAI Team ID 和自带 Node 运行时；缺少合格运行时会停止，不会要求安装 Homebrew 或来历不明的 Node。
 2. 下载 `RiseOnAir-v1.1.0-beta.4-macos-universal.dmg`，打开后把 **Rise On Air.app** 拖入 Applications。也提供 ZIP 作为替代。
-3. 打开 Rise On Air，按原生提示安装并启动。首次配置或引擎升级前请保存输入并退出官方客户端；后续客户端已经运行时，先验证当前主题；通过则直接复用，失败才尝试恢复，仍须再次验证。冷热启动均播放展示动画。
+3. 打开 Rise On Air，按原生提示安装并启动。首次配置或引擎升级前请保存输入并退出官方客户端；后续先检查当前主题首帧，通过则直接复用；失败才恢复，由上游启动事务确认首帧就绪。完整布局检查在后台运行。冷热启动均播放展示动画。
 
 ## 登录恢复与 Dock 入口
 
@@ -65,3 +65,11 @@ CI 新增已有主题直接复用、缺失主题恢复、恢复失败不报告�
 2026-10-20，[GitHub Actions run 39396182084](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39396182084) 的 macos-15、macos-15-intel 和 release 三项全部成功。双平台均完成 Universal 编译、原生 WKWebView/音频/截图、资源安全及启动分支回归测试、签名校验和 DMG 挂载。
 
 发布源码提交为 e85642f，DMG、ZIP 和 SHA256SUMS-macos.txt 已公开上传至 [beta.3 Release](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.3)。这不替代真实登录用户的客户端冷启动与后台恢复验收。
+
+## beta.4 启动优化与原生 CI 验收记录
+
+2026-10-21，[GitHub Actions run 39503380042](https://github.com/qt0713/RiseOnAir-Codex-P4R/actions/runs/39503380042) 的 Apple Silicon、Intel 和发布任务全部通过。源码提交为 `4f8619a16baaa47ef9d3d9ebb427ce06df8b002f`；[beta.4 Release](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/tag/v1.1.0-beta.4) 已提供 Universal DMG、ZIP 和校验文件。
+
+本次新增首帧检查、1.5 秒已有会话探测、启动事务确认后直接交接，以及独立后台完整审计。两个 runner 均通过原生动画/音频/截图、Blob 伪元素壁纸检测、慢速或失败审计不阻塞启动、取消不误报成功、资源安全、签名与 DMG 挂载检查。发布文件的 GitHub SHA-256 摘要已与下载的 SHA256SUMS-macos.txt 一致核对。
+
+CI 没有真实登录的 Codex 会话，因此不承诺 Mac 的实际冷启动秒数。Windows 本机及用户已确认的提速不能代替 Mac 实机验收。升级前仍需保存输入、退出官方客户端，用新应用完成引擎更新。
