@@ -46,7 +46,7 @@ if($StageOnly){Write-Output $stage;exit 0}
 if(-not $Compiler){$Compiler=Join-Path $root '.cache\inno\ISCC.exe'}
 & $Compiler ('/DBuildRoot='+$stage) ('/DOutputRoot='+$output) (Join-Path $root 'installer\RiseOnAir.iss')
 if($LASTEXITCODE -ne 0){throw 'Installer compilation failed.'}
-$installer=Join-Path $output 'RiseOnAir-Setup-v1.0.7-windows-x64.exe'
+$installer=Join-Path $output 'RiseOnAir-Setup-v1.0.8-windows-x64.exe'
 $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 ($hash+'  '+[IO.Path]::GetFileName($installer))|Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
 Write-Output $installer

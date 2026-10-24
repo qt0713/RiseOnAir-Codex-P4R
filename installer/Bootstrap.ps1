@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([ValidateSet('Preflight','Install','Uninstall','Verify')][string]$Action,[string]$InstallRoot,[switch]$NoLaunch)
+param([ValidateSet('Preflight','Install','Uninstall','Verify')][string]$Action,[string]$InstallRoot,[switch]$NoLaunch,[switch]$StartAtLogin)
 . (Join-Path $PSScriptRoot 'Common.ps1')
 if(-not $InstallRoot){$InstallRoot=Split-Path -Parent $PSScriptRoot}
 $InstallRoot=[IO.Path]::GetFullPath($InstallRoot)
@@ -52,12 +52,14 @@ if($Action -eq 'Install'){
  . (Join-Path $PSScriptRoot 'Surface-Patch.ps1')
  Set-RiseSurfaceAdapter -StateRoot $stateRoot -InstallRoot $InstallRoot
  $imported=Import-DreamSkinThemeZip -ArchivePath (Join-Path $InstallRoot 'theme.zip') -StateRoot $stateRoot
- $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.7';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
+ $record=[ordered]@{product='RiseOnAir';schema=1;version='1.0.8';stateRoot=$stateRoot;themeDirectory=$imported.Path;codexPackageFamily=$package.PackageFamilyName;installedUtc=[DateTime]::UtcNow.ToString('o')}
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'integration.json'),($record|ConvertTo-Json -Depth 6),(New-Object Text.UTF8Encoding($false)))
  $appId=$package.PackageFamilyName+'!App'
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'CodexAppId.txt'),$appId)
  [IO.File]::WriteAllText((Join-Path $InstallRoot 'CodexExe.txt'),$codexExecutable)
  . (Join-Path $PSScriptRoot 'Entry-Points.ps1')
+ $loginFlag=Join-Path $InstallRoot 'EnableLogin.flag'
+ if($StartAtLogin){[IO.File]::WriteAllText($loginFlag,'enabled')}elseif(Test-Path -LiteralPath $loginFlag){Remove-Item -LiteralPath $loginFlag}
  Set-RiseEntryPoints -InstallRoot $InstallRoot -Record $record
  Set-RiseWindowRelaunch -InstallRoot $InstallRoot -Record $record
  Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class RiseShellRefresh { [DllImport("shell32.dll",CharSet=CharSet.Unicode)] public static extern void SHChangeNotify(uint e,uint f,string p,IntPtr q); }'

@@ -17,6 +17,9 @@ function Set-RiseWindowRelaunch {
   try {
    $hwnd=if($NativeWindow){$NativeWindow}else{$p.MainWindowHandle.ToInt64()}
    if(-not $hwnd -or $p.Path -ine $expected -or [RiseOnAir.ShellIdentity]::WindowProcess($hwnd) -ne $p.Id){continue}
+   # Store updates change WindowsApps paths. Refresh only after matching this
+   # real window's process to the currently registered official executable.
+   if(-not $Remove){[IO.File]::WriteAllText((Join-Path $InstallRoot 'CodexExe.txt'),$expected)}
    if(-not $Remove){
     # Older installers grouped every visible official process as a Rise client.
     # Clear only our exact overrides on other instances, keeping them running.
@@ -82,8 +85,13 @@ function Set-RiseEntryPoints {
   Set-RiseWindowRelaunch -InstallRoot $InstallRoot -Record $Record -Remove
   return
  }
- if(-not(Test-Path -LiteralPath $run)){New-Item -Path $run|Out-Null}
- New-ItemProperty -LiteralPath $run -Name 'RiseOnAir' -Value $command -PropertyType String -Force|Out-Null
+ if(Test-Path -LiteralPath (Join-Path $InstallRoot 'EnableLogin.flag')){
+  if(-not(Test-Path -LiteralPath $run)){New-Item -Path $run|Out-Null}
+  New-ItemProperty -LiteralPath $run -Name 'RiseOnAir' -Value $command -PropertyType String -Force|Out-Null
+ }else{
+  $current=Get-ItemPropertyValue -LiteralPath $run -Name 'RiseOnAir' -ErrorAction SilentlyContinue
+  if($current -ceq $command){Remove-ItemProperty -LiteralPath $run -Name 'RiseOnAir'}
+ }
  New-Item -ItemType Directory -Path $backups -Force|Out-Null
  $pin=Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar'
  $w=New-Object -ComObject WScript.Shell

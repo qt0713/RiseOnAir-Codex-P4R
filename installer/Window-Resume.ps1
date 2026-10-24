@@ -18,8 +18,11 @@ function Restore-RiseThemeWindow {
    Start-Sleep -Milliseconds 200
   }
  }while($true)
- if($bounds.visibility -eq 'hidden' -or $ShowForHandoff){
-  if($Codex.Version -ne '26.1013.4894.0'){throw 'This client version has not been verified for native main-window resume.'}
+ # A visible renderer needs only verified native HWND matching, not private IPC.
+ # Keep private resume limited to versions whose handler has been reviewed.
+ $resumeVersions=@('26.1013.4894.0','26.1016.8622.0')
+ if($bounds.visibility -eq 'hidden' -or ($ShowForHandoff -and $Codex.Version -in $resumeVersions)){
+  if($Codex.Version -notin $resumeVersions){throw 'The hidden main window uses an unreviewed client version. Open its official window once, then retry Rise On Air.'}
   if($IntroEventName){
    $event=$null
    try{$event=[Threading.EventWaitHandle]::OpenExisting($IntroEventName);if(-not $event.WaitOne(12000)){throw 'Intro handoff timed out.'}}catch [Threading.WaitHandleCannotBeOpenedException]{}finally{if($event){$event.Dispose()}}

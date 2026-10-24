@@ -116,6 +116,7 @@ namespace RiseOnAir {
    Muted=args.Contains("--muted");
    Log("begin preview="+Preview+" muted="+Muted);
    if(args.Contains("--login")) {
+    if(!File.Exists(Path.Combine(Home,"EnableLogin.flag"))){Log("login-disabled");return 0;}
     bool loginOwns;
     using(var loginMutex=new Mutex(true,"Local\\RiseOnAir.Login",out loginOwns)) {
      if(!loginOwns)return 0;

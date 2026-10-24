@@ -1,4 +1,4 @@
-#ifndef BuildRoot
+﻿#ifndef BuildRoot
  #error BuildRoot is required
 #endif
 #ifndef OutputRoot
@@ -7,7 +7,7 @@
 [Setup]
 AppId={{3E824C17-87A2-41C7-A45D-5C253B1DABF5}
 AppName=Rise On Air · 理世主题
-AppVersion=1.0.7
+AppVersion=1.0.8
 AppPublisher=qt0713
 AppPublisherURL=https://github.com/qt0713/RiseOnAir-Codex-P4R
 AppSupportURL=https://github.com/qt0713/RiseOnAir-Codex-P4R/issues
@@ -22,10 +22,10 @@ WizardStyle=modern
 Compression=lzma2/normal
 SolidCompression=yes
 OutputDir={#OutputRoot}
-OutputBaseFilename=RiseOnAir-Setup-v1.0.7-windows-x64
+OutputBaseFilename=RiseOnAir-Setup-v1.0.8-windows-x64
 SetupIconFile={#BuildRoot}\rise-icon-v1.ico
 UninstallDisplayIcon={app}\rise-icon-v1.ico
-VersionInfoVersion=1.0.7.0
+VersionInfoVersion=1.0.8.0
 VersionInfoDescription=Rise On Air · 理世主题安装包
 VersionInfoProductName=Rise On Air
 ChangesAssociations=yes
@@ -42,6 +42,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "{#BuildRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#BuildRoot}\scripts\Bootstrap.ps1"; Flags: dontcopy
 Source: "{#BuildRoot}\scripts\Common.ps1"; Flags: dontcopy
+
+[Tasks]
+Name: "autostart"; Description: "登录 Windows 时自动启动 Codex 并加载理世主题"; Flags: unchecked
 
 [Icons]
 Name: "{autodesktop}\Codex - 理世启动"; Filename: "{app}\RiseOnAir.exe"; WorkingDir: "{app}"; IconFilename: "{app}\rise-icon-v1.ico"; Comment: "理世主题与 3.2 秒有声启动动画"; AppUserModelID: "qt0713.RiseOnAir.Codex"
@@ -69,10 +72,13 @@ begin
 end;
 
 function RunBootstrap(const Action: String): Boolean;
-var ResultCode: Integer;
+var ResultCode: Integer; Options: String;
 begin
+  Options := '';
+  if (Action = 'Install') and WizardIsTaskSelected('autostart') then
+    Options := ' -StartAtLogin';
   Result := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
-    '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + AddQuotes(ExpandConstant('{app}\scripts\Bootstrap.ps1')) + ' -Action ' + Action + ' -InstallRoot ' + AddQuotes(ExpandConstant('{app}')),
+    '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File ' + AddQuotes(ExpandConstant('{app}\scripts\Bootstrap.ps1')) + ' -Action ' + Action + ' -InstallRoot ' + AddQuotes(ExpandConstant('{app}')) + Options,
     ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := Result and (ResultCode = 0);
 end;
