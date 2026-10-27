@@ -23,6 +23,7 @@ namespace RiseOnAir {
   public static bool ExistingSession;
   public static volatile bool ResumeCompleted;
   public static volatile bool ResumeFailed;
+  public static volatile bool OfficialFallback;
   static volatile bool themeVerified;
   public static readonly ManualResetEvent StartupFinished=new ManualResetEvent(true);
   public static readonly string IntroEventName="Local\\RiseOnAir.IntroFinished."+Guid.NewGuid().ToString("N");
@@ -66,6 +67,7 @@ namespace RiseOnAir {
   public static void OpenCodex() {
    resumeAttempted=true;
    ResumeFailed=false;
+   OfficialFallback=false;
    themeVerified=false;
    ResumeCompleted=ResumeVerifiedSession();
    ExistingSession=ResumeCompleted;
@@ -76,12 +78,13 @@ namespace RiseOnAir {
     var ready=Path.Combine(Home,"LaunchReady.flag");if(File.Exists(ready))File.Delete(ready);
     using(var process=ThemeProcess(false,false)) {
      Log("theme-activation-requested");
-      if(!process.WaitForExit(150000)||process.ExitCode!=0){ResumeFailed=true;Log("theme-start-failed");return;}
+      if(!process.WaitForExit(150000)||process.ExitCode!=0){ResumeFailed=true;Log("theme-start-failed");OpenOfficialFallback();return;}
       var windowFlag=Path.Combine(Home,"LaunchWindow-"+launchToken+".flag");
       try {ResumeCompleted=AcceptWindowFlag(windowFlag);}catch{ResumeCompleted=false;}
       finally{try{File.Delete(windowFlag);}catch{}}
       if(!ResumeCompleted)ResumeCompleted=ResumeVerifiedSession();ResumeFailed=!ResumeCompleted;
       Log("new-session-resume="+ResumeCompleted);
+      if(ResumeFailed)OpenOfficialFallback();
     }
     return;
    }
@@ -92,6 +95,16 @@ namespace RiseOnAir {
    if(!Regex.IsMatch(appId,@"^[A-Za-z0-9._-]+![A-Za-z0-9._-]+$")) throw new InvalidDataException("Invalid application identifier.");
    Process.Start(new ProcessStartInfo("explorer.exe","shell:AppsFolder\\"+appId) {UseShellExecute=true,WindowStyle=ProcessWindowStyle.Hidden});
    Log("codex-activation-requested "+appId);
+  }
+  public static void OpenOfficialFallback() {
+   // A theme failure must not trap the user in the intro. This does not mark
+   // the theme ready or terminate any existing application/process.
+   try {
+    var visible=CodexSession.Window();
+    if(visible!=IntPtr.Zero){sessionWindow=visible;Activate(visible);}
+    else ActivatePackage();
+    OfficialFallback=true;Log("official-fallback theme-unverified; see logs/last-error.txt");
+   }catch(Exception ex){Log("official-fallback-error "+ex.Message);}
   }
   static bool ResumeVerifiedSession() {
    var token=Guid.NewGuid().ToString("N");var flag=Path.Combine(Home,"Resume-"+token+".flag");

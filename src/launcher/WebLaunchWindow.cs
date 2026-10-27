@@ -71,14 +71,15 @@ namespace RiseOnAir {
    if(activationRequested||System.Threading.Interlocked.CompareExchange(ref activationInFlight,1,0)!=0)return;activationRequested=true;
    Program.StartupFinished.Reset();
    // Skipping/closing the intro must not abort a still-starting application.
-   new System.Threading.Thread(()=>{try{Program.OpenCodex();}catch(Exception ex){Program.ResumeFailed=true;Program.Log("activation-error "+ex.Message);if(!closing)Dispatcher.BeginInvoke(new Action(()=>{waiting=true;Script("showWaiting(true)");}));}finally{System.Threading.Interlocked.Exchange(ref activationInFlight,0);Program.StartupFinished.Set();}}){IsBackground=false,Name="Rise On Air startup"}.Start();
+   new System.Threading.Thread(()=>{try{Program.OpenCodex();}catch(Exception ex){Program.ResumeFailed=true;Program.Log("activation-error "+ex.Message);Program.OpenOfficialFallback();}finally{System.Threading.Interlocked.Exchange(ref activationInFlight,0);Program.StartupFinished.Set();}}){IsBackground=false,Name="Rise On Air startup"}.Start();
   }
   void Tick() {
    if(closing)return;
    if(waiting) {
+    if(Program.StartupFinished.WaitOne(0)&&Program.OfficialFallback){Program.Log("handoff-official-fallback");FadeClose();return;}
     if(Program.ResumeFailed&&!waitNoticeShown){Topmost=false;waitNoticeShown=true;Script("showWaiting(true)");}
     if(Program.StartupFinished.WaitOne(0)&&Program.IsReady()&&!Program.ResumeFailed){Program.Log("handoff-verified-window");FadeClose();return;}
-    if(lifetime.Elapsed.TotalSeconds-waitStart>45&&!waitNoticeShown){waitNoticeShown=true;Script("showWaiting(true)");}return;
+    if(lifetime.Elapsed.TotalSeconds-waitStart>20){Program.Log("intro-wait-budget-ended startup-continues");FadeClose();}return;
    }
    if(introFinished)return;
    if(!playing&&lifetime.Elapsed.TotalSeconds>10){Program.Log("player-open-timeout");Finish("media-open-timeout");}

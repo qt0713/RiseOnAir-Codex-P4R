@@ -6,6 +6,9 @@ function Ensure-RiseThemeSession {
  $gate=Enter-DreamSkinOperationLock -TimeoutMilliseconds 10000
  try {
   $state=Read-DreamSkinState -Path (Join-Path $Record.stateRoot 'state.json')
+  . (Join-Path $PSScriptRoot 'State-Recovery.ps1')
+  Repair-RiseStaleInjectorState -StateRoot $Record.stateRoot
+  # Keep the port hint after archiving a dead watcher; its browser may live on.
   $preferred=if($state -and $state.port){[int]$state.port}else{9335}
   $live=Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $preferred
   # Let injection begin as soon as the identity-bound endpoint is available.

@@ -18,11 +18,16 @@ function Restore-RiseThemeWindow {
    Start-Sleep -Milliseconds 200
   }
  }while($true)
- # A visible renderer needs only verified native HWND matching, not private IPC.
- # Keep private resume limited to versions whose handler has been reviewed.
- $resumeVersions=@('26.1013.4894.0','26.1016.8622.0')
- if($bounds.visibility -eq 'hidden' -or ($ShowForHandoff -and $Codex.Version -in $resumeVersions)){
-  if($Codex.Version -notin $resumeVersions){throw 'The hidden main window uses an unreviewed client version. Open its official window once, then retry Rise On Air.'}
+ # Inspect the registered package's actual handler, not its version number.
+ # Do not execute unknown IPC merely because a renderer exposes a bridge.
+ if($bounds.visibility -eq 'hidden' -or $ShowForHandoff){
+  $archive=Join-Path (Split-Path -Parent $Codex.Executable) 'resources\app.asar'
+  Invoke-RiseProcess -File $node.Path -Arguments @((Join-Path $InstallRoot 'runtime\window-capability.mjs'),$archive) -LogPrefix ($prefix+'-capability')
+  $capability=Get-Content -LiteralPath ($prefix+'-capability.out.log') -Raw -Encoding UTF8|ConvertFrom-Json
+  if($capability.schema -ne 1 -or $capability.resume -isnot [bool]){throw 'Invalid window capability result.'}
+  if(!$capability.resume -and $bounds.visibility -eq 'hidden'){throw 'Native window protocol changed; use official activation without private IPC.'}
+ }else{$capability=@{resume=$false}}
+ if($capability.resume){
   if($IntroEventName){
    $event=$null
    try{$event=[Threading.EventWaitHandle]::OpenExisting($IntroEventName);if(-not $event.WaitOne(12000)){throw 'Intro handoff timed out.'}}catch [Threading.WaitHandleCannotBeOpenedException]{}finally{if($event){$event.Dispose()}}
