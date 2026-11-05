@@ -52,6 +52,11 @@ with tempfile.TemporaryDirectory(prefix="rise-macos-test-") as temporary:
     starter.write_text('#!/bin/bash\ntouch "$(dirname "$0")/started"\n')
     result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
     assert result.returncode == 0 and b"ready-started" in result.stdout, result.stderr
+    verifier.write_text("#!/bin/bash\necho unexpected >> \"$(dirname \"$0\")/cold-probe\"\nexit 0\n")
+    result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"],
+                            env=dict(env, RISE_CLIENT_RUNNING="0"), capture_output=True, timeout=15)
+    assert result.returncode == 0 and b"ready-started" in result.stdout
+    assert not (scripts / "cold-probe").exists()
     verifier.write_text("#!/bin/bash\nexit 1\n")
     starter.write_text("#!/bin/bash\nexit 7\n")
     result = subprocess.run(["/bin/bash", str(r / "rise-control.sh"), "launch"], env=env, capture_output=True, timeout=15)
@@ -97,9 +102,30 @@ exit 7
     subprocess.run(control + ["register-login"], env=login_env, check=True, capture_output=True)
     assert plistlib.loads(plist.read_bytes()) == data
     result = subprocess.run(control + ["login"], env=login_env, capture_output=True, timeout=10)
-    assert result.returncode != 0 and not (login_home / "Library/Application Support/RiseOnAir/engine").exists()
+    assert result.returncode == 0 and b"login-disabled" in result.stdout and not (login_home / "Library/Application Support/RiseOnAir/engine").exists()
     subprocess.run(control + ["remove-login"], env=login_env, check=True, capture_output=True)
     assert not plist.exists()
+    # A real unrelated PID must survive generation recovery, and an ambiguous
+    # timestamp must remain an error rather than authorizing a signal.
+    child = subprocess.Popen(["/bin/sleep","60"])
+    try:
+        recovery = r'''
+set -eu
+. "$COMMON"
+STATE_PATH="$HOME/test-state.json"
+echo '{}' > "$STATE_PATH"
+state_field() { case "$1" in injectorPid) echo "$VICTIM";; port) echo 9341;; injectorStartedAt) echo "$STAMP";; *) echo /fixture;; esac; }
+stop_recorded_injector
+'''
+        renv=dict(env, COMMON=str(r/"engine/scripts/common-macos.sh"), VICTIM=str(child.pid))
+        for stamp,ok in [("invalid",False),("Thu Jan 1 00:00:00 1970",True)]:
+            proc=subprocess.run(["/bin/bash","-c",recovery],env=dict(renv,STAMP=stamp),capture_output=True,timeout=10)
+            assert (proc.returncode == 0) == ok, proc.stderr
+            assert child.poll() is None
+        assert list(home.glob("test-state.json.stale.*"))
+    finally:
+        child.terminate()
+        child.wait()
     support = home / "Library/Application Support/RiseOnAir"
     if support.exists():
         import shutil

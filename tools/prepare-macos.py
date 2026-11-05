@@ -46,6 +46,18 @@ def prepare(upstream=None):
     common = common.replace('INSTALL_ROOT="$HOME/.codex/codex-dream-skin-studio"', 'INSTALL_ROOT="$HOME/Library/Application Support/RiseOnAir/engine"')
     common = common.replace('STATE_ROOT="$HOME/Library/Application Support/CodexDreamSkinStudio"', 'STATE_ROOT="$HOME/Library/Application Support/RiseOnAir/DreamSkin"')
     common = common.replace("com.openai.codex-dream-skin-studio", "io.github.qt0713.riseonair.dreamskin")
+    anchor = '    printf \'Recorded injector PID %s is live but its identity does not match; refusing to signal it.'
+    if common.count(anchor) != 1:
+        raise RuntimeError("Mac recycled PID anchor changed")
+    common = common.replace(anchor, '''    local actual_start
+    actual_start="$(process_started_at "$pid")"
+    local stamp='^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Za-z]{3} [0-9]{1,2} [0-9]{2}:[0-9]{2}:[0-9]{2} [0-9]{4}$'
+    if [[ "$actual_start" =~ $stamp && "$saved_start" =~ $stamp && "$actual_start" != "$saved_start" ]]; then
+      /bin/cp -p "$STATE_PATH" "$STATE_PATH.stale.$(/bin/date +%s).$$" || return 1
+      printf 'Recovered stale injector generation without signalling its current PID.\\n' >&2
+      return 0
+    fi
+''' + anchor)
     files["scripts/common-macos.sh"] = common.encode()
     injector = files["scripts/injector.mjs"].decode()
     anchor = 'const combinedCss = safeCssRuntime ? `${css}\\n${safeCssRuntime}\\n` : css;'
@@ -59,6 +71,11 @@ def prepare(upstream=None):
     files["scripts/rise-first-paint.mjs"] = (ROOT / "src/runtime/first-paint.mjs").read_bytes()
     files["scripts/injector.mjs"] = injector.encode()
     verifier = files["scripts/verify-dream-skin-macos.sh"].decode()
+    # The quick check is limited to read-only first-paint probes. The starter
+    # retains upstream deep signature verification before launch/restart.
+    if verifier.count('\nrequire_macos_runtime\n') != 1:
+        raise RuntimeError("Mac signature verification anchor changed")
+    verifier = verifier.replace('\nrequire_macos_runtime\n','\nif [ "${RISE_FIRST_PAINT:-}" = 1 ]; then require_macos_runtime quick; else require_macos_runtime; fi\n')
     if verifier.count('--timeout-ms 30000') != 1:
         raise RuntimeError("Mac verification timeout anchor changed")
     files["scripts/verify-dream-skin-macos.sh"] = verifier.replace(

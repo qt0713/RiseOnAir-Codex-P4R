@@ -16,6 +16,9 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     var duration = 0.0
     var messages = [String]()
     var skipped = false
+    var fallback = false
+    var playbackStart: TimeInterval = 0
+    var playSeconds: TimeInterval = 0
     var output: URL { URL(fileURLWithPath: ProcessInfo.processInfo.environment["RISE_TEST_OUTPUT"] ?? NSTemporaryDirectory()).appendingPathComponent("rise-native-test.json") }
     var resources: URL { Bundle.main.resourceURL! }
 
@@ -48,7 +51,13 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             else if response != .alertFirstButtonReturn { NSApp.terminate(nil); return }
         }
         showWindow()
-        if !preview { applyTheme() }
+        if !preview {
+            applyTheme()
+            DispatchQueue.main.asyncAfter(deadline: .now()+8) { [weak self] in
+                guard let self = self, !self.preview, !self.introEnded else { return }
+                self.endIntro()
+            }
+        }
         if selfTest {
             DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self] in
                 self?.finishTest(error: "Native player did not finish within 25 seconds")
@@ -90,8 +99,9 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         messages.append(value)
         if value.hasPrefix("metadata ") { duration = Double(value.dropFirst(9)) ?? 0 }
         if value == "audio-loaded" { audioLoaded = true }
-        if value == "ready" { web.evaluateJavaScript("riseHost.start({muted:\(selfTest || args.contains("--muted") ? "true" : "false"),preview:\(preview ? "true" : "false")})", completionHandler: nil) }
-        if value == "capture" {
+        if value == "playing" { playbackStart = ProcessInfo.processInfo.systemUptime }
+        if value == "ready" && !introEnded { web.evaluateJavaScript("riseHost.start({muted:\(selfTest || args.contains("--muted") ? "true" : "false"),preview:\(preview ? "true" : "false"),capture:\(selfTest ? "true" : "false")})", completionHandler: nil) }
+        if value == "capture" && selfTest {
             web.takeSnapshot(with: nil) { [weak self] image, error in
                 guard let self = self, let image = image, let tiff = image.tiffRepresentation,
                       let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) else { return }
@@ -100,15 +110,22 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             }
         }
         if value == "ended" {
-            introEnded = true
+            playSeconds = ProcessInfo.processInfo.systemUptime - playbackStart
             if selfTest { finishTest(error: nil) }
-            else if !preview { if ready { finishHandoff() } else { waiting(false) } }
+            else { endIntro() }
         }
         if value == "skip" {
             skipped = true
-            if preview || ready { NSApp.terminate(nil) } else { window.orderOut(nil) }
+            if preview { NSApp.terminate(nil) } else { endIntro() }
         }
-        if value.hasPrefix("error ") { if selfTest { finishTest(error: value) } else { waiting(true) } }
+        if value.hasPrefix("error ") { if selfTest { finishTest(error: value) } else if !preview { endIntro() } else { waiting(true) } }
+    }
+    func endIntro() {
+        introEnded = true
+        guard !preview else { return }
+        // Release the overlay so Chromium can paint the real client while verification runs.
+        window.orderOut(nil)
+        if ready || fallback { finishHandoff() }
     }
     func waiting(_ failed: Bool) { web?.evaluateJavaScript("riseHost.waiting(\(failed ? "true" : "false"))", completionHandler: nil) }
     func finishHandoff() {
@@ -134,6 +151,9 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             let handle = try FileHandle(forWritingTo: log); handle.seekToEndOfFile()
             let task = Process(); task.executableURL = URL(fileURLWithPath: "/bin/bash")
             task.arguments = [resources.appendingPathComponent("rise-control.sh").path, action]
+            var env = ProcessInfo.processInfo.environment
+            env["RISE_CLIENT_RUNNING"] = NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").isEmpty ? "0" : "1"
+            task.environment = env
             task.standardOutput = handle; task.standardError = handle; task.standardInput = FileHandle.nullDevice
             task.terminationHandler = { [weak self] child in
                 try? handle.close()
@@ -153,16 +173,29 @@ final class RiseApp: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             guard let self = self else { return }; self.ready = success
             if success && (self.introEnded || self.skipped) { self.finishHandoff() }
             else if !success {
-                self.waiting(true)
-                let alert = NSAlert(); alert.messageText = "主题尚未确认加载"; alert.informativeText = "首次安装请先退出 Codex / ChatGPT，再从菜单重试。已安装时请检查官方客户端版本和日志。"; alert.addButton(withTitle: "显示日志"); alert.addButton(withTitle: "保留预览")
-                if alert.runModal() == .alertFirstButtonReturn { self.showLogs() }
+                // On a cold failure, only open a client that passes the same
+                // official identity checks; never retry a cancelled restart.
+                if NSRunningApplication.runningApplications(withBundleIdentifier: "com.openai.codex").isEmpty {
+                    self.runControl("open-official") { opened in
+                        if !opened {
+                            self.window.orderOut(nil)
+                            let notice = NSAlert(); notice.messageText = "未能打开官方客户端"; notice.informativeText = "请确认已安装官方应用。可在日志中查看主题未加载的原因。"
+                            notice.addButton(withTitle: "关闭"); notice.addButton(withTitle: "显示日志")
+                            if notice.runModal() == .alertSecondButtonReturn { self.showLogs() }
+                        }
+                        NSApp.terminate(nil)
+                    }
+                    return
+                }
+                self.fallback = true
+                if self.introEnded || self.skipped { self.finishHandoff() }
             }
         }
     }
     func finishTest(error: String?) {
         guard selfTest else { return }; selfTest = false
-        let pass = error == nil && abs(duration - 3.2) < 0.001 && captured && audioLoaded && messages.contains("ended")
-        let result: [String: Any] = ["pass":pass,"duration":duration,"captured":captured,"audioLoaded":audioLoaded,"messages":messages,"error":error ?? "","macOS":ProcessInfo.processInfo.operatingSystemVersionString]
+        let pass = error == nil && abs(duration - 3.2) < 0.001 && playSeconds >= 3 && playSeconds < 8 && captured && audioLoaded && messages.contains("ended")
+        let result: [String: Any] = ["pass":pass,"duration":duration,"elapsed":playSeconds,"captured":captured,"audioLoaded":audioLoaded,"messages":messages,"error":error ?? "","macOS":ProcessInfo.processInfo.operatingSystemVersionString]
         try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted,.sortedKeys]).write(to: output)
         exit(pass ? 0 : 1)
     }

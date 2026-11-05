@@ -105,7 +105,7 @@ case "$ACTION" in
       fail '主题初始化失败；请查看日志并重试。'
     fi
     /bin/cp "$RESOURCES/VERSION" "$SUPPORT/installed-version"
-    register_login
+    remove_login
     printf 'Rise On Air installed.\n' ;;
   launch)
     if [ ! -f "$SUPPORT/installed-version" ] || ! /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version"; then
@@ -113,8 +113,7 @@ case "$ACTION" in
     fi
     export RISE_FIRST_PAINT=1
     phase first-paint-existing
-    if RISE_VERIFY_TIMEOUT_MS=1500 "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json" 2> "$SUPPORT/last-verification-error.log"; then
-      register_login
+    if [ "${RISE_CLIENT_RUNNING:-1}" != 0 ] && RISE_VERIFY_TIMEOUT_MS=1500 "$ENGINE/scripts/verify-dream-skin-macos.sh" > "$SUPPORT/last-verification.json" 2> "$SUPPORT/last-verification-error.log"; then
       audit_later
       phase ready-existing
       exit 0
@@ -124,16 +123,16 @@ case "$ACTION" in
     # The pinned starter commits active state only after its own verification.
     # Cancellation exits 20; set -e rejects it instead of treating it as ready.
     phase first-paint-confirmed-by-start
-    register_login
     audit_later
     phase ready-started ;;
   login)
-    # Never install, ask for restart or close an existing session at login.
-    [ -f "$SUPPORT/installed-version" ] && /usr/bin/cmp -s "$RESOURCES/VERSION" "$SUPPORT/installed-version" || exit 1
-    [ -f "$ENGINE/RISE-OWNED" ] || exit 1
-    export RISE_FIRST_PAINT=1
-    "$ENGINE/scripts/start-dream-skin-macos.sh"
-    audit_later ;;
+    phase login-disabled; exit 0 ;;
+  open-official)
+    . "$RESOURCES/engine/scripts/common-macos.sh"
+    discover_codex_app
+    require_macos_runtime
+    phase theme-unverified-open-official
+    /usr/bin/open "$CODEX_BUNDLE" ;;
   audit)
     unset RISE_FIRST_PAINT
     [ -f "$ENGINE/RISE-OWNED" ] || exit 1
