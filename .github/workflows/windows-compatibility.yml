@@ -1,0 +1,27 @@
+name: Windows compatibility regression
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'installer/State-Recovery.ps1'
+      - 'installer/Session-Ensure.ps1'
+      - 'src/runtime/window-capability.mjs'
+      - 'tools/test-state-recovery.ps1'
+      - 'tools/test-window-capability.mjs'
+      - '.github/workflows/windows-compatibility.yml'
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate split modules and changed bundler expressions
+        run: node --test tools/test-window-capability.mjs
+      - name: Validate protected and recycled process identities
+        shell: powershell
+        run: ./tools/test-state-recovery.ps1

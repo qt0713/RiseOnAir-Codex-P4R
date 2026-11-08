@@ -8,6 +8,8 @@ const handler='if(o.type===`open-current-main-window`||o.type===`open-in-main-wi
 test('handler contract survives quote and local variable changes',()=>{
  for(const quote of ['"',"'",'`'])assert.equal(supportsWindowResume(handler.replaceAll('`',quote)),true);
  assert.equal(supportsWindowResume(handler.replaceAll('r.','windowRef.')),true);
+ const flipped=handler.replace(/o\.type===(`[^`]+`)/g,'$1===o.type').replace('o.stealFocus===!0','!0===o.stealFocus');
+ assert.equal(supportsWindowResume(flipped),true);
 });
 test('changed or unrelated protocols are rejected',()=>{
  for(const text of [handler.replace('r.restore()','r.close()'),handler.replace('r.show()','other.show()'),handler.replace('open-current-main-window','changed-command'),handler.replace('r.focus()','r.hide()'),'case`open-current-main-window`:break;'+handler.slice(handler.indexOf('r&&'))])assert.equal(supportsWindowResume(text),false);
@@ -17,10 +19,10 @@ test('bounded ASAR reader checks current content and rejects malformed archives'
  try{
   const file=path.join(folder,'app.asar');
   const source=Buffer.from(handler);
-  const index=Buffer.from(JSON.stringify({files:{'.vite':{files:{build:{files:{'main-future.js':{size:source.length,offset:'0'}}}}}}}));
+  const index=Buffer.from(JSON.stringify({files:{'.vite':{files:{build:{files:{'early-bootstrap-future.js':{size:source.length,offset:'0'},'preload.js':{size:2,offset:String(source.length)}}}}}}}));
   const header=Buffer.alloc(index.length+8);header.writeUInt32LE(index.length,4);index.copy(header,8);
   const prefix=Buffer.alloc(8);prefix.writeUInt32LE(header.length,4);
-  fs.writeFileSync(file,Buffer.concat([prefix,header,source]));assert.equal(inspectArchive(file).resume,true);
+  fs.writeFileSync(file,Buffer.concat([prefix,header,source,Buffer.from('//')]));assert.equal(inspectArchive(file).resume,true);
   fs.writeFileSync(file,Buffer.from([1,2,3]));assert.throws(()=>inspectArchive(file));
   prefix.writeUInt32LE(0xffffffff,4);fs.writeFileSync(file,prefix);assert.throws(()=>inspectArchive(file));
  }finally{fs.rmSync(folder,{recursive:true,force:true});}

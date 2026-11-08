@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 export function supportsWindowResume(source) {
+  // Bundlers may reverse strict comparisons without changing their meaning.
+  source=source.replace(/(["'`])(open-current-main-window|open-in-main-window)\1===([\w$]+)\.type/g,(_,q,value,id)=>`${id}.type===${q}${value}${q}`)
+    .replace(/!0===([\w$]+)\.stealFocus/g,'$1.stealFocus===!0');
   const start=/if\(([\w$]+)\.type===(["'`])open-current-main-window\2\|\|\1\.type===(["'`])open-in-main-window\3\)\{/g;
   for (const match of source.matchAll(start)) {
     const tail=source.slice(match.index,match.index+1800);
@@ -28,15 +31,20 @@ export function inspectArchive(file) {
     const length=header.readUInt32LE(4);
     if(length>size-8)throw Error('Invalid ASAR index');
     const files=JSON.parse(header.subarray(8,8+length).toString()).files?.['.vite']?.files?.build?.files;
-    const names=Object.keys(files||{}).filter(n=>/^main(?:-[\w-]+)?\.js$/.test(n));
-    if(names.length!==1)throw Error('No unique main bundle');
-    const entry=files[names[0]],offset=8+size+Number(entry.offset);
+    const names=Object.keys(files||{}).filter(n=>/^[\w.-]+\.js$/.test(n));
+    if(!names.length||names.length>128)throw Error('Invalid build module count');
+    let total=0;const supported=[];
+    for(const name of names){
+    const entry=files[name],offset=8+size+Number(entry.offset);
     if(entry.unpacked||entry.link||!Number.isSafeInteger(offset)||!Number.isSafeInteger(entry.size)||entry.size<1||entry.size>32*1024*1024||offset<8+size||offset+entry.size>stat.size)throw Error('Invalid main bundle bounds');
+    total+=entry.size;if(total>64*1024*1024)throw Error('Build module budget exceeded');
     const content=Buffer.alloc(entry.size);
     if(fs.readSync(fd,content,0,entry.size,offset)!==entry.size)throw Error('Truncated main bundle');
+    if(supportsWindowResume(content.toString()))supported.push(name);
+    }
     const after=fs.fstatSync(fd);
     if(after.size!==stat.size||after.mtimeMs!==stat.mtimeMs)throw Error('Application changed during probe');
-    return {schema:1,resume:supportsWindowResume(content.toString()),method:'reviewed-handler-shape',bundle:names[0]};
+    return {schema:1,resume:supported.length===1,method:'reviewed-handler-shape',bundles:supported};
   }finally{fs.closeSync(fd);}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){
