@@ -1,3 +1,35 @@
+﻿# Add semantic titlebar support to both verification and the renderer contract.
+# Validate every file before writing; keep exact upstream bytes for rollback.
+function Set-RiseTitlebarCompatibility {
+ param([string]$StateRoot,[switch]$Remove)
+ $assets=Join-Path $StateRoot 'engine\assets'
+ $hashes=@{
+  'selectors.json'='939217A45F6502B9939A23F8EB6D1E766D306A94F462ADFE38D9D50D0C191873'
+  'renderer-inject.js'='576C52AF236D251E815C3398A8A8DA419287E1281EBF2E05718DDD9FADB248CC'
+  'dream-skin.css'='6CD518F4F4A2A17CCB7F4BFCF03ECF73FB3F74E9D8F3C9788751ABA06F46C828'
+ }
+ $writes=@()
+ foreach($name in $hashes.Keys){
+  $path=Join-Path $assets $name; $backup=$path+'.rise-titlebar-original'
+  foreach($p in @($path,$backup)){Assert-DreamSkinNoReparseComponents -Path $p}
+  $source=if(Test-Path -LiteralPath $backup){$backup}else{$path}
+  if((Get-FileHash -LiteralPath $source).Hash -ne $hashes[$name]){throw "Unsupported titlebar adapter source: $name"}
+  $original=[IO.File]::ReadAllText($source)
+  $patched=$original.Replace('[data-app-shell-header-edge-scroll]', '[data-app-shell-header-edge-scroll], [data-app-shell-titlebar]')
+  if($original -ceq $patched){throw "Missing titlebar selector: $name"}
+  $current=[IO.File]::ReadAllText($path)
+  if($current -cne $original -and $current -cne $patched){throw "Externally modified titlebar adapter: $name"}
+  $writes+=@{Path=$path;Backup=$backup;Text=$patched}
+ }
+ foreach($w in $writes){
+  if($Remove){if(Test-Path -LiteralPath $w.Backup){[IO.File]::Copy($w.Backup,$w.Path,$true)}}
+  else {
+   if(-not(Test-Path -LiteralPath $w.Backup)){[IO.File]::Copy($w.Path,$w.Backup,$false)}
+   [IO.File]::WriteAllText($w.Path,$w.Text,(New-Object Text.UTF8Encoding($false)))
+  }
+ }
+}
+
 # An exact-version, reversible adapter. Never modifies the official Codex app.
 function Set-RiseSurfaceAdapter {
  param([string]$StateRoot,[string]$InstallRoot,[switch]$Remove)
@@ -54,6 +86,7 @@ function Set-RiseSurfaceAdapter {
   $starterCurrent=[IO.File]::ReadAllText($starter)
   if($starterCurrent -cne $starterOriginal -and $starterCurrent -cne $starterPatched){throw 'Startup adapter was modified externally.'}
   if($Remove){
+   Set-RiseTitlebarCompatibility -StateRoot $StateRoot -Remove
    if($current.Contains($marker)){[IO.File]::Copy($backup,$injector,$true)}
    if(Test-Path -LiteralPath $starterBackup){[IO.File]::Copy($starterBackup,$starter,$true)}
    if(Test-Path -LiteralPath $firstPaint){Remove-Item -LiteralPath $firstPaint -Force}
@@ -61,6 +94,7 @@ function Set-RiseSurfaceAdapter {
    return
   }
   if(-not $original.Contains($anchor)){throw 'Upstream adapter anchor not found.'}
+  Set-RiseTitlebarCompatibility -StateRoot $StateRoot
   if(-not(Test-Path -LiteralPath $backup)){[IO.File]::Copy($injector,$backup,$false)}
   if(-not(Test-Path -LiteralPath $starterBackup)){[IO.File]::Copy($starter,$starterBackup,$false)}
   [IO.File]::Copy((Join-Path $InstallRoot 'runtime\first-paint.mjs'),$firstPaint,$true)

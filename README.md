@@ -16,7 +16,7 @@
 
 前往 **[Releases 下载 Windows 安装包](https://github.com/qt0713/RiseOnAir-Codex-P4R/releases/latest)**：
 
-1. 下载 Release 中实际列出的 Windows EXE（当前公开版为 `RiseOnAir-Setup-v1.0.10-windows-x64.exe`）；可用同页 `SHA256SUMS.txt` 核对摘要。
+1. 下载 Release 中实际列出的 Windows EXE（当前公开版为 `RiseOnAir-Setup-v1.0.11-windows-x64.exe`）；可用同页 `SHA256SUMS.txt` 核对摘要。
 2. 保存 Codex 中尚未发送的输入，然后运行安装包。首次配置或需要更新引擎时可能关闭客户端；按当前用户安装，无需接管 WindowsApps。
 3. 保持安装完成页的“启动 Codex 并应用理世主题”选项，或双击桌面 **Codex - 理世启动**。
 4. 默认只在点击时启动。需要开机自动打开时，安装器中勾选“登录 Windows 时自动启动 Codex 并加载理世主题”；同时在 Windows **设置 → 应用 → 启动**关闭官方 Codex / ChatGPT 的重复登录启动。
@@ -35,6 +35,10 @@
 | 开始菜单：恢复 Codex 原始外观 | 使用上游恢复流程恢复外观并关闭调试会话。 |
 
 快捷方式直接引用安装目录中的 `rise-icon-v1.ico`，同时可执行文件内嵌同一图标。ICO 包含 **16 / 24 / 32 / 48 / 64 / 128 / 256 px**，保留透明圆角。安装结束会通知 Windows Shell 刷新，避免依赖工作区或临时目录中的图片。
+
+## v1.0.11：新版顶部栏兼容修复
+
+适配官方客户端 **26.1120.6357.0**。修复背景已加载却因顶部栏标记变化而验证失败、长时间等待并撤回主题的问题。保留新旧结构识别、真实背景与窗口就绪检查，保持不开机自启。详见 [1.0.11 更新说明](docs/WINDOWS-RELEASE-1.0.11.md)。
 
 ## v1.0.10：新版模块拆分与受保护进程恢复
 

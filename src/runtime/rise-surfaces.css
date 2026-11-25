@@ -48,3 +48,8 @@ html[data-dream-skin="active"] [data-ds-part="composer"]
   button:is([class~="bg-composer-primary"], [class~="bg-primary-solid"], [type="submit"]) * {
   color: #242124 !important;
 }
+
+/* Codex 26.1120 moved the titlebar outside main. Keep its controls native. */
+html[data-dream-skin="active"] header[data-app-shell-titlebar] {
+  background: transparent !important;
+}
